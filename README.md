@@ -19,16 +19,29 @@ Minimal v0.1: a global shortcut opens a small window. Sign in with **GitHub OAut
 
 ## Environment
 
-Set these when running GitCP (or put them in your shell profile):
+**Option A — `.env` file (recommended)**  
+
+In the project root, copy [`.env.example`](.env.example) to **`.env`** and add your values:
+
+```bash
+cp .env.example .env
+# edit .env — it is gitignored
+```
+
+The app loads **`.env`** and **`.env.local`** (local overrides) on startup from the same directory as `package.json`.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITCP_GITHUB_CLIENT_ID` | Yes | OAuth App Client ID |
+| `GITCP_GITHUB_CLIENT_SECRET` | Yes | OAuth App client secret |
+| `GITCP_OAUTH_PORT` | No | Loopback port (default `53682`); must match the callback URL on GitHub |
+
+**Option B — shell**  
 
 ```bash
 export GITCP_GITHUB_CLIENT_ID="your_client_id"
 export GITCP_GITHUB_CLIENT_SECRET="your_client_secret"
 ```
-
-Optional:
-
-- `GITCP_OAUTH_PORT` — loopback port (default `53682`). Must match the callback URL registered on GitHub.
 
 ## Run
 

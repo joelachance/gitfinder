@@ -12,6 +12,7 @@
     "node": ">=18"
   },
   "devDependencies": {
+    "dotenv": "^16.4.5",
     "electron": "^34.0.0"
   }
 }
