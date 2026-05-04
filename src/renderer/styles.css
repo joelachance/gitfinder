@@ -27,11 +27,11 @@ body {
   display: none !important;
 }
 
-/* 10px inset from the window edge */
+/* Inset from the window edge (same value as text-box margin step −3px for density) */
 #app {
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 7px;
   -webkit-user-select: none;
   user-select: none;
 }
@@ -51,7 +51,7 @@ body {
 }
 
 .drag-strip {
-  height: 10px;
+  height: 7px;
   flex-shrink: 0;
   border-radius: 14px 14px 0 0;
   -webkit-app-region: drag;
@@ -61,11 +61,12 @@ body {
 /*
  * .text-box — bordered region (same look as the old #query border): typing area is only
  * the top part; profile sits bottom-right inside this same box.
- * Equal inset from the shell on all sides (margin), including below when results are empty.
+ * Sides/bottom: 9px from the shell. Top margin is 2px so 7px drag strip + 2px = 9px total above
+ * the field (matches horizontal 9px). Bottom uses 9px margin only — no extra main padding when empty.
  */
 .text-box {
   flex-shrink: 0;
-  margin: 12px;
+  margin: 2px 9px 9px 9px;
   display: flex;
   flex-direction: column;
   border-radius: 10px;
@@ -81,7 +82,7 @@ body {
 
 .text-box-input-row {
   flex-shrink: 0;
-  padding: 10px 12px 6px;
+  padding: 7px 9px 3px;
 }
 
 #query {
@@ -106,7 +107,7 @@ body {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 4px 10px 10px;
+  padding: 1px 7px 7px;
 }
 
 /* Hint + results below the text-box; horizontal inset matches .text-box margin */
@@ -116,12 +117,17 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 12px 12px;
+  padding: 0 9px 0;
+}
+
+/* Bottom padding only when the list is shown — avoids doubling space under the text box when empty */
+.input-box-main:has(.results:not(:empty)) {
+  padding-bottom: 9px;
 }
 
 .hint {
   flex-shrink: 0;
-  padding: 8px 0 0;
+  padding: 5px 0 0;
   font-size: 11px;
   color: #f85149;
 }
@@ -135,7 +141,7 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   margin: 0;
-  padding: 8px 8px 4px;
+  padding: 5px 0 1px;
   max-height: 280px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -149,8 +155,8 @@ body {
 
 .results:not(:empty) {
   border-top: 1px solid #21262d;
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 3px;
+  padding-top: 3px;
 }
 
 .results li {
