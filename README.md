@@ -39,11 +39,26 @@ bun run start
 
 On Linux, if you see a sandbox error when running as root, you can start the binary with `--no-sandbox` (only when you understand the tradeoff), e.g. `bun x electron . --no-sandbox`.
 
-## Global shortcut and window
+## Opening GitCP (shortcut + tray)
 
-- **Shortcut:** **⌘+Shift+P** (macOS) or **Ctrl+Shift+P** (Windows/Linux). A three-key shortcut like `⌘+P+R` is not used: on macOS, Electron can treat it like **⌘+R** and conflict with **Refresh**, so only **⌘+Shift+P** is registered. If that slot is taken, the app falls back to **⌘+Option+P** / **Ctrl+Alt+P**. A one-line note in the window shows the active shortcut.
-- **UI:** Frameless, wide “composer” bar (like a chat input) with one main text field; **Escape** hides the window. The app **keeps running** in the background and **keeps your search state**; use the global shortcut again to show the palette. **Drag** the top edge of the window to move it.
-- **Quit:** Use the system **Quit** command (e.g. **⌘+Q** on Mac, or close from the taskbar on Windows).
+GitCP registers **several** global shortcuts when possible (you’ll see which ones worked in the footer):
+
+| Priority (macOS) | Typical binding |
+|------------------|------------------|
+| 1 | **⌘+Shift+P** |
+| 2 | **⌘+P+R** (if Electron accepts it on your OS) |
+| 3 | **⌘+Option+P** |
+| 4 | **⌥+Space** |
+
+Windows/Linux: **Ctrl+Shift+P**, **Ctrl+P+R**, **Ctrl+Alt+P**, **Alt+Space**.
+
+If **none** of them register (system shortcuts already taken), use the **menu bar** icon on macOS or **system tray** on Windows/Linux — click it to open the palette.
+
+**Technical note:** The preload script must load correctly (`preload.cjs`). If the UI shows “preload failed”, reinstall deps or run `bun install` from this repo.
+
+**Window:** Frameless composer-style panel; **Escape** hides it; the app **stays running** and keeps search state. **Drag** the top strip to move.
+
+**Quit:** Tray/menu → **Quit**, or **⌘+Q** / **Alt+F4** when focused (depending on OS).
 
 ## What v0.1 does not include
 

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('gitcp', {
   searchIssues: (query) => ipcRenderer.invoke('gitcp:search-issues', query),

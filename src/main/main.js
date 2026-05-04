@@ -1,4 +1,13 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  shell,
+  Tray,
+} from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -10,28 +19,41 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-let mainWindow = null;
-
-/**
- * macOS: Electron does not parse `Command+P+R` as a three-key chord reliably; it can
- * overlap `Command+R` (refresh) and open GitCP when only ⌘R is pressed. Use ⌘⇧P / Ctrl+Shift+P.
- */
-const PRIMARY_ACCELERATOR =
-  process.platform === 'darwin' ? 'Command+Shift+P' : 'Control+Shift+P';
-const FALLBACK_ACCELERATOR =
-  process.platform === 'darwin' ? 'Command+Alt+P' : 'Control+Alt+P';
-
-let activeShortcut = null;
-let usedFallback = false;
-let appIsQuitting = false;
-
+/** Preload must be CommonJS — ESM preload paths often fail to load with sandbox and leave `window.gitcp` undefined. */
 function getPreloadPath() {
-  return path.join(__dirname, '../preload/preload.js');
+  return path.join(__dirname, '../preload/preload.cjs');
 }
 
 function getRendererPath() {
   return path.join(__dirname, '../renderer/index.html');
 }
+
+let mainWindow = null;
+let tray = null;
+
+/**
+ * Shortcuts to try in order. macOS: Command+P+R after Command+Shift+P (many apps use ⌘⇧P).
+ * Final fallback is Alt+Space for visibility without stealing Cmd/Ctrl combos.
+ */
+const SHORTCUT_CANDIDATES =
+  process.platform === 'darwin'
+    ? [
+        'Command+Shift+P',
+        'Command+P+R',
+        'Command+Alt+P',
+        'Alt+Space',
+      ]
+    : [
+        'Control+Shift+P',
+        'Control+P+R',
+        'Control+Alt+P',
+        'Alt+Space',
+      ];
+
+let registeredShortcuts = [];
+let activeShortcut = null;
+
+let appIsQuitting = false;
 
 function broadcastAuth() {
   const state = getAuthState();
@@ -41,7 +63,10 @@ function broadcastAuth() {
 }
 
 function showPalette() {
-  if (!mainWindow) return;
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
@@ -53,7 +78,69 @@ function hidePalette() {
   mainWindow.hide();
 }
 
+function createTrayIcon() {
+  const buf = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  return nativeImage.createFromBuffer(buf);
+}
+
+function createTray() {
+  if (tray) return;
+  tray = new Tray(createTrayIcon());
+  tray.setToolTip('GitCP — click to open palette');
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Open GitCP',
+      click: () => showPalette(),
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        appIsQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  tray.setContextMenu(menu);
+  tray.on('click', () => showPalette());
+}
+
+function unregisterAllShortcuts() {
+  for (const acc of registeredShortcuts) {
+    try {
+      globalShortcut.unregister(acc);
+    } catch {
+      /* ignore */
+    }
+  }
+  registeredShortcuts = [];
+  activeShortcut = null;
+}
+
+function registerGlobalShortcuts() {
+  unregisterAllShortcuts();
+
+  for (const acc of SHORTCUT_CANDIDATES) {
+    const ok = globalShortcut.register(acc, () => showPalette());
+    if (ok) {
+      registeredShortcuts.push(acc);
+      if (!activeShortcut) activeShortcut = acc;
+    } else {
+      console.warn('[gitcp] Could not register shortcut:', acc);
+    }
+  }
+
+  if (!activeShortcut) {
+    console.error('[gitcp] No global shortcuts registered — use the menu bar icon to open GitCP.');
+  }
+}
+
 function createWindow() {
+  if (mainWindow) return;
+
   mainWindow = new BrowserWindow({
     width: 720,
     height: 120,
@@ -90,27 +177,13 @@ app.on('before-quit', () => {
   appIsQuitting = true;
 });
 
-function registerGlobalShortcut() {
-  const tryRegister = (acc) => globalShortcut.register(acc, showPalette);
-  if (tryRegister(PRIMARY_ACCELERATOR)) {
-    activeShortcut = PRIMARY_ACCELERATOR;
-    usedFallback = false;
-    return;
-  }
-  console.warn(
-    '[gitcp] Could not register',
-    PRIMARY_ACCELERATOR,
-    '— trying fallback',
-    FALLBACK_ACCELERATOR,
-  );
-  if (tryRegister(FALLBACK_ACCELERATOR)) {
-    activeShortcut = FALLBACK_ACCELERATOR;
-    usedFallback = true;
-    return;
-  }
-  console.error('[gitcp] Could not register any global shortcut');
-  activeShortcut = null;
-  usedFallback = false;
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    showPalette();
+  });
 }
 
 async function searchIssuesAndPrs(query) {
@@ -172,11 +245,11 @@ function setupIpc() {
   });
 
   ipcMain.handle('gitcp:shortcut-info', () => ({
-    primary: PRIMARY_ACCELERATOR,
-    fallback: FALLBACK_ACCELERATOR,
-    registered: Boolean(activeShortcut),
+    candidates: SHORTCUT_CANDIDATES,
+    registered: registeredShortcuts,
+    primary: registeredShortcuts[0] ?? null,
     accelerator: activeShortcut,
-    primaryFailed: usedFallback,
+    anyRegistered: registeredShortcuts.length > 0,
   }));
 
   ipcMain.handle('gitcp:hide', () => {
@@ -194,7 +267,8 @@ function setupIpc() {
 app.whenReady().then(() => {
   setupIpc();
   createWindow();
-  registerGlobalShortcut();
+  registerGlobalShortcuts();
+  createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -206,9 +280,9 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  unregisterAllShortcuts();
 });
 
 app.on('window-all-closed', () => {
-  /* Window is hidden, not destroyed — keep running so the global shortcut still works. */
+  /* Window may be hidden; tray keeps app alive on all platforms for palette hotkeys. */
 });

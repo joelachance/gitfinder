@@ -9,6 +9,10 @@ let items = [];
 let activeIndex = -1;
 let debounceTimer = null;
 
+function api() {
+  return window.gitcp;
+}
+
 function setHint(text) {
   hintEl.textContent = text ?? '';
   updateWindowHeight();
@@ -19,7 +23,11 @@ function updateWindowHeight() {
     if (!appEl.classList.contains('hidden')) {
       const rect = appEl.getBoundingClientRect();
       const h = Math.ceil(rect.height) + 24;
-      window.gitcp.setPaletteHeight(h);
+      try {
+        api()?.setPaletteHeight?.(h);
+      } catch {
+        /* ignore */
+      }
     }
   });
 }
@@ -57,7 +65,7 @@ function renderResults() {
 async function openSelected() {
   const row = items[activeIndex];
   if (!row?.html_url) return;
-  await window.gitcp.openExternal(row.html_url);
+  await api().openExternal(row.html_url);
 }
 
 async function runSearch() {
@@ -70,7 +78,7 @@ async function runSearch() {
   }
   setHint('');
   try {
-    const data = await window.gitcp.searchIssues(q);
+    const data = await api().searchIssues(q);
     items = data.items ?? [];
     activeIndex = items.length ? 0 : -1;
     renderResults();
@@ -98,13 +106,13 @@ function updateAuthUi(status) {
 }
 
 btnAuth.addEventListener('click', async () => {
-  const status = await window.gitcp.authStatus();
+  const status = await api().authStatus();
   setHint('');
   try {
     if (status.loggedIn) {
-      await window.gitcp.logout();
+      await api().logout();
     } else {
-      await window.gitcp.login();
+      await api().login();
     }
   } catch (e) {
     setHint(e?.message || 'Authentication failed');
@@ -131,7 +139,7 @@ searchInput.addEventListener('keydown', (e) => {
     void openSelected();
   } else if (e.key === 'Escape') {
     e.preventDefault();
-    void window.gitcp.hide();
+    void api().hide();
   }
 });
 
@@ -140,22 +148,39 @@ function scrollActiveIntoView() {
   el?.scrollIntoView({ block: 'nearest' });
 }
 
-window.gitcp.onAuthChanged((state) => updateAuthUi(state));
-
-window.gitcp.onFocusSearch(() => {
-  searchInput.focus();
-  searchInput.select();
-  updateWindowHeight();
-});
-
-Promise.all([window.gitcp.authStatus(), window.gitcp.shortcutInfo()]).then(([status, sc]) => {
-  updateAuthUi(status);
-  if (sc?.registered && sc?.accelerator) {
-    shortcutNote.textContent = sc.primaryFailed
-      ? `Shortcut: ${sc.accelerator} (${sc.primary} was unavailable)`
-      : `Shortcut: ${sc.accelerator}`;
+function bootstrap() {
+  if (!window.gitcp) {
+    hintEl.textContent =
+      'Internal error: preload failed. Quit and reinstall, or run from the repo with bun run start.';
+    appEl.classList.remove('hidden');
+    return;
   }
-  appEl.classList.remove('hidden');
-  searchInput.focus();
-  updateWindowHeight();
-});
+
+  window.gitcp.onAuthChanged((state) => updateAuthUi(state));
+
+  window.gitcp.onFocusSearch(() => {
+    searchInput.focus();
+    searchInput.select();
+    updateWindowHeight();
+  });
+
+  Promise.all([window.gitcp.authStatus(), window.gitcp.shortcutInfo()])
+    .then(([status, sc]) => {
+      updateAuthUi(status);
+      if (sc?.registered?.length) {
+        shortcutNote.textContent = `Shortcuts: ${sc.registered.join(', ')}`;
+      } else {
+        shortcutNote.textContent =
+          'No global shortcut registered — use the GitCP icon in the menu bar (macOS) or tray (Windows/Linux) to open.';
+      }
+      appEl.classList.remove('hidden');
+      searchInput.focus();
+      updateWindowHeight();
+    })
+    .catch(() => {
+      appEl.classList.remove('hidden');
+      hintEl.textContent = 'Could not load GitCP bridge.';
+    });
+}
+
+bootstrap();
