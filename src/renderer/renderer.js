@@ -78,7 +78,13 @@ function refreshShortcutLabel() {
 function updateRefreshHint() {
   if (!resultsRefreshHintEl) return;
   const trimmed = searchInput.value.trim();
-  if (isThemeCommand(trimmed) || shouldShowSlashCommands(trimmed)) {
+  if (isThemeCommand(trimmed) || isAiCommand(trimmed) || shouldShowSlashCommands(trimmed)) {
+    resultsRefreshHintEl.textContent = '';
+    resultsRefreshHintEl.classList.add('hidden');
+    updateWindowHeight();
+    return;
+  }
+  if (isSignOutCommand(trimmed) || isApiKeysCommand(trimmed)) {
     resultsRefreshHintEl.textContent = '';
     resultsRefreshHintEl.classList.add('hidden');
     updateWindowHeight();
@@ -130,6 +136,10 @@ function refreshSearch() {
     prsListCache = null;
   } else if (isReposCommand(inputLine)) {
     reposListCache = null;
+  }
+  if (isApiKeysCommand(inputLine)) {
+    void runSearch({ forceSearchRefresh: true });
+    return;
   }
   void runSearch({ forceSearchRefresh: true });
 }
@@ -266,19 +276,19 @@ const SLASH_COMMANDS = [
   },
   {
     command: '/activity',
-    description: 'Repository events (needs owner/repo)',
+    description: 'Repository events — use /activity owner/repo',
   },
   {
     command: '/branches',
-    description: 'Branches (needs owner/repo)',
+    description: 'Branches — use /branches owner/repo',
   },
   {
     command: '/commits',
-    description: 'Recent commits (needs owner/repo)',
+    description: 'Recent commits — use /commits owner/repo',
   },
   {
     command: '/releases',
-    description: 'Releases (needs owner/repo)',
+    description: 'Releases — use /releases owner/repo',
   },
   {
     command: '/repos',
@@ -286,19 +296,31 @@ const SLASH_COMMANDS = [
   },
   {
     command: '/repo',
-    description: 'Repository summary (needs owner/repo)',
+    description: 'Repository summary — use /repo owner/repo',
   },
   {
     command: '/tags',
-    description: 'Tags (needs owner/repo)',
+    description: 'Tags — use /tags owner/repo',
   },
   {
     command: '/ci',
-    description: 'Actions workflow runs (needs owner/repo)',
+    description: 'Actions workflow runs — use /ci owner/repo',
   },
   {
     command: '/theme',
     description: 'Choose a color theme',
+  },
+  {
+    command: '/ai',
+    description: 'Ask about GitHub — include owner/repo for one-repo CI/data',
+  },
+  {
+    command: '/sign-out',
+    description: 'Sign out of GitHub',
+  },
+  {
+    command: '/api-keys',
+    description: 'OpenAI & Anthropic API keys (env + saved)',
   },
 ];
 
@@ -340,6 +362,167 @@ function isPrCommand(trimmed) {
 function isThemeCommand(trimmed) {
   const lower = trimmed.toLowerCase();
   return lower === '/theme' || lower.startsWith('/theme ');
+}
+
+function isSignOutCommand(trimmed) {
+  return trimmed.toLowerCase() === '/sign-out';
+}
+
+function isApiKeysCommand(trimmed) {
+  const lower = trimmed.toLowerCase();
+  return lower === '/api-keys' || lower.startsWith('/api-keys ');
+}
+
+/** Text after `/ai` (empty if the user only typed `/ai`). */
+function aiUserQuestion(trimmed) {
+  if (!/^\/ai\b/i.test(trimmed)) return '';
+  return trimmed.replace(/^\/ai\b/i, '').trim();
+}
+
+/**
+ * Message sent to the AI: optional filter badges (`repo:`, `org:`, `user:`) plus the question text.
+ * Uses the same `kind:value` encoding as filter search (`buildSearchQuery`).
+ * @param {string} trimmed
+ */
+function buildAiChatPayload(trimmed) {
+  const q = aiUserQuestion(trimmed);
+  const pills = searchFilters.map((f) => `${f.kind}:${f.value}`);
+  const badgeLine =
+    pills.length > 0 ? `Active filter badges: ${pills.join(' ')}` : '';
+  if (!badgeLine) return q;
+  if (!q) return badgeLine;
+  return `${badgeLine}\n\n${q}`;
+}
+
+function isAiCommand(trimmed) {
+  return /^\/ai(\s|$)/i.test(trimmed);
+}
+
+function isAiIncomplete(trimmed) {
+  return (
+    isAiCommand(trimmed) &&
+    !aiUserQuestion(trimmed) &&
+    searchFilters.length === 0
+  );
+}
+
+function apiKeysFilterQuery(trimmed) {
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith('/api-keys')) return '';
+  return trimmed.slice('/api-keys'.length).trim();
+}
+
+function providerDisplayName(p) {
+  return p === 'openai' ? 'OpenAI' : 'Anthropic';
+}
+
+function apiKeysStatusSubtitle(st) {
+  if (!st.configured) return 'Not set · Enter to paste a key';
+  const src =
+    st.source === 'app'
+      ? 'Saved in app'
+      : st.source === 'env'
+        ? 'Environment variable'
+        : 'Not active';
+  return `${st.preview} · ${src} · Enter to replace`;
+}
+
+/**
+ * @param {string} trimmed
+ * @param {{
+ *   openai: { configured: boolean; source: string; preview: string; startupEnvAvailable: boolean; suppressEnv: boolean };
+ *   anthropic: { configured: boolean; source: string; preview: string; startupEnvAvailable: boolean; suppressEnv: boolean };
+ * }} status
+ */
+function buildApiKeysItems(trimmed, status) {
+  const q = apiKeysFilterQuery(trimmed).toLowerCase();
+  /** @type {unknown[]} */
+  const rows = [];
+
+  function push(row) {
+    const hay = `${row.title} ${row.subtitle}`.toLowerCase();
+    if (!q || hay.includes(q)) rows.push(row);
+  }
+
+  for (const p of /** @type {const} */ (['openai', 'anthropic'])) {
+    const st = status[p];
+    push({
+      __apiKeysRow: true,
+      action: 'set',
+      provider: p,
+      title: `${providerDisplayName(p)} API key`,
+      subtitle: apiKeysStatusSubtitle(st),
+    });
+    if (st.source === 'env' && st.configured) {
+      push({
+        __apiKeysRow: true,
+        action: 'unset-env',
+        provider: p,
+        title: `${providerDisplayName(p)} — Stop using environment variable`,
+        subtitle: 'Hide the launch-time key for this model until you resume or paste a new key',
+      });
+    }
+    if (st.source === 'app') {
+      const envName = p === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
+      push({
+        __apiKeysRow: true,
+        action: 'clear-app',
+        provider: p,
+        title: `${providerDisplayName(p)} — Delete saved key`,
+        subtitle: st.startupEnvAvailable
+          ? `Falls back to ${envName} from when GitCP started`
+          : 'Removes the stored secret from this device',
+      });
+    }
+    if (st.suppressEnv && st.startupEnvAvailable) {
+      push({
+        __apiKeysRow: true,
+        action: 'resume-env',
+        provider: p,
+        title: `${providerDisplayName(p)} — Resume from environment`,
+        subtitle: 'Use the key that was available when GitCP started',
+      });
+    }
+  }
+
+  return rows;
+}
+
+async function handleApiKeysAction(row) {
+  const { action, provider } = row;
+  if (action === 'set') {
+    const label = providerDisplayName(provider);
+    const next = window.prompt(`Paste ${label} API key`);
+    if (next === null) return;
+    const t = next.trim();
+    if (!t) {
+      setHint('Key unchanged');
+      return;
+    }
+    try {
+      await api().llmKeysSet(provider, t);
+      setHint(`${label} key saved in app`);
+    } catch (e) {
+      setHint(e?.message || 'Could not save key');
+    }
+    scheduleSearch();
+    return;
+  }
+  try {
+    if (action === 'unset-env') {
+      await api().llmKeysUnsetEnv(provider);
+      setHint('No longer using environment variable for this model');
+    } else if (action === 'clear-app') {
+      await api().llmKeysClearApp(provider);
+      setHint('Saved key removed');
+    } else if (action === 'resume-env') {
+      await api().llmKeysResumeEnv(provider);
+      setHint('Using environment key again');
+    }
+  } catch (e) {
+    setHint(e?.message || 'Update failed');
+  }
+  scheduleSearch();
 }
 
 function themePickerFilterQuery(trimmed) {
@@ -450,6 +633,9 @@ function isRepoViewIncomplete(trimmed) {
 function shouldShowSlashCommands(trimmed) {
   if (!trimmed.startsWith('/')) return false;
   if (isThemeCommand(trimmed)) return false;
+  if (isSignOutCommand(trimmed)) return false;
+  if (isApiKeysCommand(trimmed)) return false;
+  if (isAiCommand(trimmed)) return false;
   if (isIssuesCommand(trimmed)) return false;
   if (isReposCommand(trimmed)) return false;
   if (isPrCommand(trimmed)) return false;
@@ -794,6 +980,17 @@ function renderResults() {
     const row = document.createElement('div');
     row.className = 'result-row';
 
+    if (item.__aiResponse) {
+      li.classList.add('result-row--ai');
+      const pre = document.createElement('pre');
+      pre.className = 'ai-response';
+      pre.textContent = typeof item.text === 'string' ? item.text : '';
+      li.appendChild(pre);
+      li.setAttribute('aria-label', 'AI reply');
+      resultsEl.appendChild(li);
+      return;
+    }
+
     if (item.__themeOption) {
       const main = document.createElement('div');
       main.className = 'result-main';
@@ -849,6 +1046,60 @@ function renderResults() {
         activeIndex = i;
         renderResults();
         applySelectedSlashCommand();
+      });
+      resultsEl.appendChild(li);
+      return;
+    }
+
+    if (item.__signOutRow) {
+      const iconWrap = resultIcon('result-icon--signout', Svg.issueClosed);
+      iconWrap.title = 'Sign out';
+      const main = document.createElement('div');
+      main.className = 'result-main';
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = item.title;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = item.subtitle;
+      main.appendChild(title);
+      main.appendChild(meta);
+      row.appendChild(iconWrap);
+      row.appendChild(main);
+      li.appendChild(row);
+      li.setAttribute('aria-label', `${item.title}: ${item.subtitle}`);
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeIndex = i;
+        renderResults();
+        void openSelected();
+      });
+      resultsEl.appendChild(li);
+      return;
+    }
+
+    if (item.__apiKeysRow) {
+      const iconWrap = resultIcon('result-icon--api-keys', Svg.key);
+      iconWrap.title = 'API key';
+      const main = document.createElement('div');
+      main.className = 'result-main';
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = item.title;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = item.subtitle;
+      main.appendChild(title);
+      main.appendChild(meta);
+      row.appendChild(iconWrap);
+      row.appendChild(main);
+      li.appendChild(row);
+      li.setAttribute('aria-label', `${item.title}: ${item.subtitle}`);
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeIndex = i;
+        renderResults();
+        void openSelected();
       });
       resultsEl.appendChild(li);
       return;
@@ -961,10 +1212,28 @@ function applySelectedSlashCommand() {
 
 async function openSelected() {
   const row = items[activeIndex];
+  if (row?.__aiResponse) {
+    return;
+  }
   if (row?.__themeOption) {
     applyTheme(row.themeId);
     searchInput.value = '';
     scheduleSearch();
+    return;
+  }
+  if (row?.__signOutRow) {
+    try {
+      await api().logout();
+      searchInput.value = '';
+      setHint('Signed out of GitHub');
+      scheduleSearch();
+    } catch (e) {
+      setHint(e?.message || 'Sign out failed');
+    }
+    return;
+  }
+  if (row?.__apiKeysRow) {
+    await handleApiKeysAction(row);
     return;
   }
   if (row?.__slashCommand) {
@@ -1010,6 +1279,60 @@ async function runSearch(options = {}) {
     return;
   }
 
+  if (isSignOutCommand(inputLine)) {
+    items = [
+      {
+        __signOutRow: true,
+        title: 'Sign out of GitHub',
+        subtitle: 'Disconnect OAuth for this app on this machine',
+      },
+    ];
+    activeIndex = items.length ? 0 : -1;
+    setHint('Enter to sign out');
+    setLoading(false);
+    renderResults();
+    updateRefreshHint();
+    return;
+  }
+
+  if (isApiKeysCommand(inputLine)) {
+    setLoading(true);
+    renderResults();
+    try {
+      const status = await api().llmKeysStatus();
+      if (seq !== loadSeq) return;
+      items = buildApiKeysItems(inputLine, status);
+      activeIndex = items.length ? 0 : -1;
+      setHint(items.length ? '' : 'No matching rows', { muted: !items.length });
+    } catch (err) {
+      if (seq !== loadSeq) return;
+      items = [];
+      activeIndex = -1;
+      setHint(err?.message || 'Could not load API key status');
+    } finally {
+      endLoading();
+      renderResults();
+      updateRefreshHint();
+    }
+    return;
+  }
+
+  if (isAiIncomplete(inputLine)) {
+    issuesListCache = null;
+    prsListCache = null;
+    reposListCache = null;
+    items = [];
+    activeIndex = -1;
+    setHint(
+      'Ask a question after /ai (or add repo/org/user filter badges first — they are sent with your prompt). One-repo CI: include owner/repo or use a repo: badge. Keys: /api-keys or OPENAI_API_KEY / ANTHROPIC_API_KEY.',
+      { muted: true },
+    );
+    setLoading(false);
+    renderResults();
+    updateRefreshHint();
+    return;
+  }
+
   if (shouldShowSlashCommands(inputLine)) {
     items = buildSlashPickerItems(inputLine);
     activeIndex = items.length ? 0 : -1;
@@ -1026,7 +1349,10 @@ async function runSearch(options = {}) {
     reposListCache = null;
     items = [];
     activeIndex = -1;
-    setHint('Add owner/repo after the command (e.g. octocat/Hello-World)', { muted: true });
+    setHint(
+      'These commands need **owner/repo** after the slash — e.g. /ci octocat/Hello-World, /repo org/name, /releases org/name. Same pattern for /activity, /branches, /commits, /tags.',
+      { muted: true },
+    );
     setLoading(false);
     renderResults();
     updateRefreshHint();
@@ -1288,6 +1614,56 @@ async function runSearch(options = {}) {
     return;
   }
 
+  if (isAiCommand(inputLine)) {
+    const question = buildAiChatPayload(inputLine);
+    issuesListCache = null;
+    prsListCache = null;
+    reposListCache = null;
+    setHint('');
+    items = [];
+    activeIndex = -1;
+    renderResults();
+    if (!question.trim()) {
+      endLoading();
+      updateRefreshHint();
+      return;
+    }
+    setLoading(true);
+    try {
+      const st = await api().aiStatus();
+      if (seq !== loadSeq) return;
+      if (!st?.configured) {
+        items = [];
+        activeIndex = -1;
+        renderResults();
+        setHint(
+          'No LLM API key active. Use /api-keys to paste OpenAI or Anthropic, or set OPENAI_API_KEY / ANTHROPIC_API_KEY in .env.local. Optional: GITCP_AI_PROVIDER=openai|anthropic when both are set.',
+          { muted: true },
+        );
+        endLoading();
+        updateRefreshHint();
+        return;
+      }
+      const data = await api().aiChat(question);
+      if (seq !== loadSeq) return;
+      const reply = typeof data?.reply === 'string' ? data.reply : '';
+      items = [{ __aiResponse: true, text: reply }];
+      activeIndex = 0;
+      setHint(`AI (${st.provider || 'openai'}) · Esc hides palette`, { muted: true });
+      renderResults();
+    } catch (err) {
+      if (seq !== loadSeq) return;
+      items = [];
+      activeIndex = -1;
+      renderResults();
+      setHint(err?.message || 'AI request failed');
+    } finally {
+      endLoading();
+      updateRefreshHint();
+    }
+    return;
+  }
+
   issuesListCache = null;
   prsListCache = null;
   reposListCache = null;
@@ -1325,6 +1701,9 @@ function scheduleSearch() {
     isPrCommand(trimmed) ||
     isReposCommand(trimmed) ||
     isThemeCommand(trimmed) ||
+    isSignOutCommand(trimmed) ||
+    isApiKeysCommand(trimmed) ||
+    isAiCommand(trimmed) ||
     shouldShowSlashCommands(trimmed) ||
     isRepoViewIncomplete(trimmed) ||
     Boolean(parseRepoViewCommand(trimmed));
@@ -1428,7 +1807,13 @@ document.addEventListener('keydown', (e) => {
   if (appEl.classList.contains('hidden')) return;
   if (!(e.metaKey || e.ctrlKey) || (e.key !== 'r' && e.key !== 'R')) return;
   const line = searchInput.value.trim();
-  if (!parseRepoViewCommand(line) && !isReposCommand(line) && !buildSearchQuery().trim()) return;
+  if (
+    !parseRepoViewCommand(line) &&
+    !isReposCommand(line) &&
+    !(isAiCommand(line) && aiUserQuestion(line)) &&
+    !buildSearchQuery().trim()
+  )
+    return;
   e.preventDefault();
   refreshSearch();
 });

@@ -26,4 +26,15 @@ contextBridge.exposeInMainWorld('gitcp', {
   shortcutInfo: () => ipcRenderer.invoke('gitcp:shortcut-info'),
   hide: () => ipcRenderer.invoke('gitcp:hide'),
   setPaletteHeight: (heightPx) => ipcRenderer.invoke('gitcp:set-palette-height', heightPx),
+  aiStatus: () => ipcRenderer.invoke('gitcp:ai-status'),
+  aiChat: (message) =>
+    ipcRenderer.invoke('gitcp:ai-chat', {
+      message: typeof message === 'string' ? message : '',
+    }),
+  llmKeysStatus: () => ipcRenderer.invoke('gitcp:llm-keys-status'),
+  llmKeysSet: (provider, value) =>
+    ipcRenderer.invoke('gitcp:llm-keys-set', { provider, value }),
+  llmKeysClearApp: (provider) => ipcRenderer.invoke('gitcp:llm-keys-clear-app', { provider }),
+  llmKeysUnsetEnv: (provider) => ipcRenderer.invoke('gitcp:llm-keys-unset-env', { provider }),
+  llmKeysResumeEnv: (provider) => ipcRenderer.invoke('gitcp:llm-keys-resume-env', { provider }),
 });

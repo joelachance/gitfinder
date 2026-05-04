@@ -565,6 +565,27 @@ body {
   user-select: none;
 }
 
+.results li.result-row--ai {
+  cursor: default;
+  user-select: text;
+}
+
+.results li.result-row--ai:hover,
+.results li.result-row--ai.active {
+  background: transparent;
+}
+
+.ai-response {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--cp-text);
+  max-width: 100%;
+}
+
 .result-row {
   display: flex;
   flex-direction: row;

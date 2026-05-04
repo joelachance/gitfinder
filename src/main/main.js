@@ -18,6 +18,7 @@ import {
   loginWithOAuth,
   logout,
 } from './github-oauth.js';
+import { runAiChat, getAiStatus } from './ai-chat.js';
 import {
   fetchRepoViewItems,
   findAccessibleRepoWithActions,
@@ -25,6 +26,14 @@ import {
   listReposWithCi,
   parseOwnerRepo,
 } from './github-repo.js';
+import {
+  initLlmKeys,
+  llmKeysStatus,
+  setLlmKey,
+  clearLlmAppKey,
+  unsetLlmEnvKey,
+  resumeLlmEnv,
+} from './llm-keys.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -395,7 +404,9 @@ async function getRepoViewData(kind, fullName, options = {}) {
   const { forceRefresh = false } = options;
   const k = typeof kind === 'string' ? kind.toLowerCase() : '';
   if (!REPO_VIEW_KINDS.has(k)) {
-    throw new Error('Unknown repository command.');
+    throw new Error(
+      'Unknown repository command. Use /repo, /releases, /ci, /tags, /branches, /commits, or /activity followed by owner/repo.',
+    );
   }
   const token = loadToken()?.access_token;
   if (!token) {
@@ -403,7 +414,9 @@ async function getRepoViewData(kind, fullName, options = {}) {
   }
   const pair = parseOwnerRepo(fullName);
   if (!pair) {
-    throw new Error('Use owner/repo (e.g. octocat/Hello-World).');
+    throw new Error(
+      `Add owner/repo after the command so GitHub can load this data — example: /${k} octocat/Hello-World (organization or user, slash, repository name).`,
+    );
   }
   const cacheKey = `${k}/${pair.owner.toLowerCase()}/${pair.repo.toLowerCase()}`;
   if (!forceRefresh) {
@@ -485,6 +498,37 @@ function setupIpc() {
     return getAuthState();
   });
 
+  ipcMain.handle('gitcp:llm-keys-status', () => llmKeysStatus());
+
+  ipcMain.handle('gitcp:llm-keys-set', async (_e, payload) => {
+    const p = payload?.provider;
+    const value = typeof payload?.value === 'string' ? payload.value : '';
+    if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
+    setLlmKey(p, value);
+    return llmKeysStatus();
+  });
+
+  ipcMain.handle('gitcp:llm-keys-clear-app', async (_e, payload) => {
+    const p = payload?.provider;
+    if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
+    clearLlmAppKey(p);
+    return llmKeysStatus();
+  });
+
+  ipcMain.handle('gitcp:llm-keys-unset-env', async (_e, payload) => {
+    const p = payload?.provider;
+    if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
+    unsetLlmEnvKey(p);
+    return llmKeysStatus();
+  });
+
+  ipcMain.handle('gitcp:llm-keys-resume-env', async (_e, payload) => {
+    const p = payload?.provider;
+    if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
+    resumeLlmEnv(p);
+    return llmKeysStatus();
+  });
+
   ipcMain.handle('gitcp:shortcut-info', () => ({
     candidates: SHORTCUT_CANDIDATES,
     registered: registeredShortcuts,
@@ -503,9 +547,25 @@ function setupIpc() {
     const h = Math.min(520, Math.max(96, Math.round(heightPx)));
     mainWindow.setContentSize(Math.max(w, 480), h);
   });
+
+  ipcMain.handle('gitcp:ai-status', () => getAiStatus());
+
+  ipcMain.handle('gitcp:ai-chat', async (_e, payload) => {
+    const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
+    if (!message) {
+      throw new Error('Type your question after /ai (example: /ai summarize open issues).');
+    }
+    const token = loadToken()?.access_token;
+    if (!token) {
+      throw new Error('Sign in with GitHub to use AI.');
+    }
+    const reply = await runAiChat(token, message);
+    return { reply };
+  });
 }
 
 app.whenReady().then(() => {
+  initLlmKeys();
   setupIpc();
   registerGlobalShortcuts();
   createTray();

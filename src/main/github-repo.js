@@ -27,7 +27,13 @@ async function ghGet(url, token) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const ghMsg = data.message || data.error || res.statusText || 'Request failed';
-    throw new Error(`${ghMsg} (HTTP ${res.status})`);
+    let hint = '';
+    if (res.status === 404) {
+      hint = ' — Check owner/repo spelling and that the repository exists.';
+    } else if (res.status === 403) {
+      hint = ' — You may lack access; confirm the repo and your token permissions.';
+    }
+    throw new Error(`${ghMsg} (HTTP ${res.status})${hint}`);
   }
   return data;
 }
@@ -36,7 +42,7 @@ async function ghGet(url, token) {
  * @param {string | null | undefined} linkHeader
  * @returns {string | null}
  */
-function nextUrlFromLinkHeader(linkHeader) {
+export function nextUrlFromLinkHeader(linkHeader) {
   if (!linkHeader) return null;
   const parts = linkHeader.split(',');
   for (const p of parts) {
@@ -363,21 +369,30 @@ export async function fetchRepoViewItems(kind, owner, repo, token) {
 const MAX_USER_REPOS_LIST = 400;
 
 /**
+ * Repositories the authenticated user can access (`owner`, `collaborator`, `organization_member`),
+ * newest push first (same query as the `/repos` palette catalog).
+ *
  * @param {string} token
+ * @param {{ maxRepos?: number }} [opts] Omit `maxRepos` to fetch every page until GitHub returns no more results.
  */
-async function fetchAllUserRepos(token) {
+export async function listUserReposPaginated(token, opts = {}) {
+  const maxRepos =
+    typeof opts.maxRepos === 'number' && Number.isFinite(opts.maxRepos) && opts.maxRepos >= 0
+      ? opts.maxRepos
+      : Number.MAX_SAFE_INTEGER;
   const headers = authHeaders(token);
   const all = [];
   let url =
     'https://api.github.com/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member';
-  while (url && all.length < MAX_USER_REPOS_LIST) {
+  while (url && all.length < maxRepos) {
     const res = await fetch(url, { headers });
     const data = await res.json().catch(() => []);
     if (!res.ok || !Array.isArray(data)) break;
     for (const r of data) {
-      if (all.length >= MAX_USER_REPOS_LIST) break;
+      if (all.length >= maxRepos) break;
       all.push(r);
     }
+    if (all.length >= maxRepos) break;
     url = nextUrlFromLinkHeader(res.headers.get('Link'));
   }
   all.sort((a, b) => {
@@ -386,6 +401,13 @@ async function fetchAllUserRepos(token) {
     return tb - ta;
   });
   return all;
+}
+
+/**
+ * @param {string} token
+ */
+async function fetchAllUserRepos(token) {
+  return listUserReposPaginated(token, { maxRepos: MAX_USER_REPOS_LIST });
 }
 
 /**
