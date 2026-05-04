@@ -59,11 +59,11 @@ GitCP registers **several** global shortcuts when possible (you’ll see which o
 | Priority (macOS) | Typical binding |
 |------------------|------------------|
 | 1 | **⌘+Shift+P** |
-| 2 | **⌘+P+R** (if Electron accepts it on your OS) |
+| 2 | **⌘+⌥+P+R** (if Electron accepts it on your OS) |
 | 3 | **⌘+Option+P** |
 | 4 | **⌥+Space** |
 
-Windows/Linux: **Ctrl+Shift+P**, **Ctrl+P+R**, **Ctrl+Alt+P**, **Alt+Space**.
+Windows/Linux: **Ctrl+Shift+P**, **Ctrl+Alt+P+R**, **Ctrl+Alt+P**, **Alt+Space**.
 
 If **none** of them register (system shortcuts already taken), use the **menu bar** icon on macOS or **system tray** on Windows/Linux — click it to open the palette.
 

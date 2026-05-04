@@ -33,20 +33,20 @@ let mainWindow = null;
 let tray = null;
 
 /**
- * Shortcuts to try in order. macOS: Command+P+R after Command+Shift+P (many apps use ⌘⇧P).
+ * Shortcuts to try in order. macOS: Command+Alt+P+R after Command+Shift+P (many apps use ⌘⇧P).
  * Final fallback is Alt+Space for visibility without stealing Cmd/Ctrl combos.
  */
 const SHORTCUT_CANDIDATES =
   process.platform === 'darwin'
     ? [
         'Command+Shift+P',
-        'Command+P+R',
+        'Command+Alt+P+R',
         'Command+Alt+P',
         'Alt+Space',
       ]
     : [
         'Control+Shift+P',
-        'Control+P+R',
+        'Control+Alt+P+R',
         'Control+Alt+P',
         'Alt+Space',
       ];
@@ -152,6 +152,8 @@ function createWindow() {
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
+    hasShadow: false,
+    ...(process.platform === 'darwin' ? { roundedCorners: false } : {}),
     title: 'GitCP',
     webPreferences: {
       preload: getPreloadPath(),
