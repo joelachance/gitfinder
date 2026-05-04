@@ -1,5 +1,15 @@
 import { resultIcon, Svg } from './icons.js';
 
+const THEME_STORAGE_KEY = 'gitcp.theme';
+
+const GITCP_THEMES = [
+  { id: 'github', title: 'GitHub dark', subtitle: 'Blue accents (default)' },
+  { id: 'arctic', title: 'Arctic glass', subtitle: 'Icy cyan on cool slate' },
+  { id: 'plum', title: 'Plum HUD', subtitle: 'Electric magenta on purple gray' },
+  { id: 'rose', title: 'Rose voltage', subtitle: 'Warm magenta-rose' },
+  { id: 'split', title: 'Split neon', subtitle: 'Cyan + magenta highlights' },
+];
+
 const searchInput = document.getElementById('query');
 const resultsEl = document.getElementById('results');
 const resultsRefreshHintEl = document.getElementById('results-refresh-hint');
@@ -65,7 +75,7 @@ function refreshShortcutLabel() {
 function updateRefreshHint() {
   if (!resultsRefreshHintEl) return;
   const trimmed = searchInput.value.trim();
-  if (shouldShowSlashCommands(trimmed)) {
+  if (isThemeCommand(trimmed) || shouldShowSlashCommands(trimmed)) {
     resultsRefreshHintEl.textContent = '';
     resultsRefreshHintEl.classList.add('hidden');
     updateWindowHeight();
@@ -283,6 +293,10 @@ const SLASH_COMMANDS = [
     command: '/ci',
     description: 'Actions workflow runs (needs owner/repo)',
   },
+  {
+    command: '/theme',
+    description: 'Choose a color theme',
+  },
 ];
 
 function isIssuesCommand(trimmed) {
@@ -309,6 +323,54 @@ function isPrCommand(trimmed) {
   if (lower === '/prs' || lower.startsWith('/prs ')) return true;
   if (lower === '/pr' || lower.startsWith('/pr ')) return true;
   return false;
+}
+
+function isThemeCommand(trimmed) {
+  const lower = trimmed.toLowerCase();
+  return lower === '/theme' || lower.startsWith('/theme ');
+}
+
+function themePickerFilterQuery(trimmed) {
+  const lower = trimmed.toLowerCase();
+  if (!lower.startsWith('/theme')) return '';
+  return trimmed.slice('/theme'.length).trim().toLowerCase();
+}
+
+function buildThemePickerItems(trimmed) {
+  const q = themePickerFilterQuery(trimmed);
+  const list = q
+    ? GITCP_THEMES.filter((t) => {
+        const hay = `${t.id} ${t.title} ${t.subtitle}`.toLowerCase();
+        return hay.includes(q);
+      })
+    : GITCP_THEMES;
+  return list.map((t) => ({
+    __themeOption: true,
+    themeId: t.id,
+    command: t.title,
+    description: t.subtitle,
+  }));
+}
+
+function applyTheme(themeId) {
+  if (!GITCP_THEMES.some((t) => t.id === themeId)) return;
+  document.documentElement.setAttribute('data-theme', themeId);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, themeId);
+  } catch {
+    /* ignore */
+  }
+}
+
+function initStoredTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved && GITCP_THEMES.some((t) => t.id === saved)) {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function prCommandFilterText(trimmed) {
@@ -352,6 +414,7 @@ function isRepoViewIncomplete(trimmed) {
 
 function shouldShowSlashCommands(trimmed) {
   if (!trimmed.startsWith('/')) return false;
+  if (isThemeCommand(trimmed)) return false;
   if (isIssuesCommand(trimmed)) return false;
   if (isReposCommand(trimmed)) return false;
   if (isPrCommand(trimmed)) return false;
@@ -690,6 +753,37 @@ function renderResults() {
     const row = document.createElement('div');
     row.className = 'result-row';
 
+    if (item.__themeOption) {
+      const main = document.createElement('div');
+      main.className = 'result-main';
+
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = item.command;
+
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = item.description;
+
+      main.appendChild(title);
+      main.appendChild(meta);
+
+      row.appendChild(main);
+      li.appendChild(row);
+      li.setAttribute('aria-label', `${item.command}: ${item.description}`);
+
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeIndex = i;
+        renderResults();
+        applyTheme(item.themeId);
+        searchInput.value = '';
+        scheduleSearch();
+      });
+      resultsEl.appendChild(li);
+      return;
+    }
+
     if (item.__slashCommand) {
       const main = document.createElement('div');
       main.className = 'result-main';
@@ -826,6 +920,12 @@ function applySelectedSlashCommand() {
 
 async function openSelected() {
   const row = items[activeIndex];
+  if (row?.__themeOption) {
+    applyTheme(row.themeId);
+    searchInput.value = '';
+    scheduleSearch();
+    return;
+  }
   if (row?.__slashCommand) {
     applySelectedSlashCommand();
     return;
@@ -851,6 +951,16 @@ async function runSearch(options = {}) {
   };
 
   const inputLine = searchInput.value.trim();
+  if (isThemeCommand(inputLine)) {
+    items = buildThemePickerItems(inputLine);
+    activeIndex = items.length ? 0 : -1;
+    setHint(items.length ? '' : 'No matching themes', { muted: !items.length });
+    setLoading(false);
+    renderResults();
+    updateRefreshHint();
+    return;
+  }
+
   if (shouldShowSlashCommands(inputLine)) {
     items = buildSlashPickerItems(inputLine);
     activeIndex = items.length ? 0 : -1;
@@ -1164,6 +1274,7 @@ function scheduleSearch() {
     t.startsWith('/issues ') ||
     isPrCommand(trimmed) ||
     isReposCommand(trimmed) ||
+    isThemeCommand(trimmed) ||
     shouldShowSlashCommands(trimmed) ||
     isRepoViewIncomplete(trimmed) ||
     Boolean(parseRepoViewCommand(trimmed));
@@ -1323,6 +1434,8 @@ function scrollActiveIntoView() {
 }
 
 function bootstrap() {
+  initStoredTheme();
+
   if (!window.gitcp) {
     hintEl.textContent =
       'Internal error: preload failed. Quit and reinstall, or run from the repo with bun run start.';

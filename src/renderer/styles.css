@@ -4,6 +4,172 @@
   box-sizing: border-box;
 }
 
+/* --- Themes (set `data-theme` on `<html>`; default + cyan/magenta variants) --- */
+html[data-theme='github'] {
+  --cp-text: #e6edf3;
+  --cp-muted: #8b949e;
+  --cp-shell-bg: #161b22;
+  --cp-field-bg: #0d1117;
+  --cp-border: #30363d;
+  --cp-accent: #58a6ff;
+  --cp-focus-ring: rgba(88, 166, 255, 0.22);
+  --cp-surface-elevated: #21262d;
+  --cp-surface-hover: #21262d;
+  --cp-row-divider: #21262d;
+  --cp-link: #58a6ff;
+  --cp-hint-error: #f85149;
+  --cp-dismiss-hover-bg: rgba(240, 246, 252, 0.08);
+  --cp-menu-shadow: rgba(0, 0, 0, 0.45);
+  --cp-filter-repo-fg: #58a6ff;
+  --cp-filter-repo-border: rgba(88, 166, 255, 0.35);
+  --cp-filter-repo-bg: rgba(88, 166, 255, 0.08);
+  --cp-filter-user-fg: #3fb950;
+  --cp-filter-user-border: rgba(63, 185, 80, 0.35);
+  --cp-filter-user-bg: rgba(63, 185, 80, 0.08);
+  --cp-filter-org-fg: #d29922;
+  --cp-filter-org-border: rgba(210, 153, 34, 0.35);
+  --cp-filter-org-bg: rgba(210, 153, 34, 0.1);
+  --cp-spinner-track: #30363d;
+  --cp-spinner-head: #8b949e;
+  --cp-status-open: #1a7f37;
+  --cp-status-closed-issue: #8250df;
+  --cp-status-draft: #6e7681;
+  --cp-status-merged: #8250df;
+  --cp-status-closed-pr: #cf222e;
+}
+
+html[data-theme='arctic'] {
+  --cp-text: #e8f4fa;
+  --cp-muted: #8fb3c9;
+  --cp-shell-bg: #0f1822;
+  --cp-field-bg: #0a1218;
+  --cp-border: #2a4555;
+  --cp-accent: #22d3ee;
+  --cp-focus-ring: rgba(34, 211, 238, 0.22);
+  --cp-surface-elevated: #152028;
+  --cp-surface-hover: #182a32;
+  --cp-row-divider: #1a3340;
+  --cp-link: #22d3ee;
+  --cp-hint-error: #f85149;
+  --cp-dismiss-hover-bg: rgba(232, 244, 250, 0.08);
+  --cp-menu-shadow: rgba(0, 0, 0, 0.5);
+  --cp-filter-repo-fg: #22d3ee;
+  --cp-filter-repo-border: rgba(34, 211, 238, 0.35);
+  --cp-filter-repo-bg: rgba(34, 211, 238, 0.1);
+  --cp-filter-user-fg: #a78bfa;
+  --cp-filter-user-border: rgba(167, 139, 250, 0.35);
+  --cp-filter-user-bg: rgba(167, 139, 250, 0.1);
+  --cp-filter-org-fg: #fb923c;
+  --cp-filter-org-border: rgba(251, 146, 60, 0.35);
+  --cp-filter-org-bg: rgba(251, 146, 60, 0.1);
+  --cp-spinner-track: #2a4555;
+  --cp-spinner-head: #8fb3c9;
+  --cp-status-open: #22d3ee;
+  --cp-status-closed-issue: #c084fc;
+  --cp-status-draft: #8fb3c9;
+  --cp-status-merged: #c084fc;
+  --cp-status-closed-pr: #f85149;
+}
+
+html[data-theme='plum'] {
+  --cp-text: #f4eaf8;
+  --cp-muted: #c9b0d4;
+  --cp-shell-bg: #18101f;
+  --cp-field-bg: #100a14;
+  --cp-border: #4a3058;
+  --cp-accent: #e879f9;
+  --cp-focus-ring: rgba(232, 121, 249, 0.22);
+  --cp-surface-elevated: #24182e;
+  --cp-surface-hover: #2d1f38;
+  --cp-row-divider: #301d3a;
+  --cp-link: #e879f9;
+  --cp-hint-error: #ff7b72;
+  --cp-dismiss-hover-bg: rgba(244, 234, 248, 0.08);
+  --cp-menu-shadow: rgba(0, 0, 0, 0.55);
+  --cp-filter-repo-fg: #e879f9;
+  --cp-filter-repo-border: rgba(232, 121, 249, 0.35);
+  --cp-filter-repo-bg: rgba(232, 121, 249, 0.1);
+  --cp-filter-user-fg: #22d3ee;
+  --cp-filter-user-border: rgba(34, 211, 238, 0.35);
+  --cp-filter-user-bg: rgba(34, 211, 238, 0.08);
+  --cp-filter-org-fg: #fb923c;
+  --cp-filter-org-border: rgba(251, 146, 60, 0.35);
+  --cp-filter-org-bg: rgba(251, 146, 60, 0.1);
+  --cp-spinner-track: #4a3058;
+  --cp-spinner-head: #c9b0d4;
+  --cp-status-open: #f472b6;
+  --cp-status-closed-issue: #d946ef;
+  --cp-status-draft: #c9b0d4;
+  --cp-status-merged: #d946ef;
+  --cp-status-closed-pr: #ff7b72;
+}
+
+html[data-theme='rose'] {
+  --cp-text: #fceff5;
+  --cp-muted: #d4a8bc;
+  --cp-shell-bg: #1c1018;
+  --cp-field-bg: #140a12;
+  --cp-border: #523045;
+  --cp-accent: #f472b6;
+  --cp-focus-ring: rgba(244, 114, 182, 0.22);
+  --cp-surface-elevated: #281420;
+  --cp-surface-hover: #321a28;
+  --cp-row-divider: #3d1f30;
+  --cp-link: #f472b6;
+  --cp-hint-error: #ff7b72;
+  --cp-dismiss-hover-bg: rgba(252, 239, 245, 0.08);
+  --cp-menu-shadow: rgba(0, 0, 0, 0.55);
+  --cp-filter-repo-fg: #f472b6;
+  --cp-filter-repo-border: rgba(244, 114, 182, 0.35);
+  --cp-filter-repo-bg: rgba(244, 114, 182, 0.1);
+  --cp-filter-user-fg: #06b6d4;
+  --cp-filter-user-border: rgba(6, 182, 212, 0.35);
+  --cp-filter-user-bg: rgba(6, 182, 212, 0.08);
+  --cp-filter-org-fg: #fbbf24;
+  --cp-filter-org-border: rgba(251, 191, 36, 0.35);
+  --cp-filter-org-bg: rgba(251, 191, 36, 0.1);
+  --cp-spinner-track: #523045;
+  --cp-spinner-head: #d4a8bc;
+  --cp-status-open: #f472b6;
+  --cp-status-closed-issue: #e879f9;
+  --cp-status-draft: #d4a8bc;
+  --cp-status-merged: #e879f9;
+  --cp-status-closed-pr: #ff7b72;
+}
+
+html[data-theme='split'] {
+  --cp-text: #eef2ff;
+  --cp-muted: #a8b8e8;
+  --cp-shell-bg: #121826;
+  --cp-field-bg: #0c1018;
+  --cp-border: #354064;
+  --cp-accent: #06b6d4;
+  --cp-focus-ring: rgba(6, 182, 212, 0.22);
+  --cp-surface-elevated: #1a2338;
+  --cp-surface-hover: #1f2a44;
+  --cp-row-divider: #243050;
+  --cp-link: #06b6d4;
+  --cp-hint-error: #ff7b72;
+  --cp-dismiss-hover-bg: rgba(238, 242, 255, 0.06);
+  --cp-menu-shadow: rgba(0, 0, 0, 0.5);
+  --cp-filter-repo-fg: #06b6d4;
+  --cp-filter-repo-border: rgba(6, 182, 212, 0.35);
+  --cp-filter-repo-bg: rgba(6, 182, 212, 0.1);
+  --cp-filter-user-fg: #d946ef;
+  --cp-filter-user-border: rgba(217, 70, 239, 0.35);
+  --cp-filter-user-bg: rgba(217, 70, 239, 0.1);
+  --cp-filter-org-fg: #fb923c;
+  --cp-filter-org-border: rgba(251, 146, 60, 0.35);
+  --cp-filter-org-bg: rgba(251, 146, 60, 0.1);
+  --cp-spinner-track: #354064;
+  --cp-spinner-head: #a8b8e8;
+  --cp-status-open: #06b6d4;
+  --cp-status-closed-issue: #d946ef;
+  --cp-status-draft: #a8b8e8;
+  --cp-status-merged: #d946ef;
+  --cp-status-closed-pr: #ff7b72;
+}
+
 html,
 body {
   margin: 0;
@@ -18,7 +184,7 @@ body {
     Consolas,
     monospace;
   font-size: 13px;
-  color: #e6edf3;
+  color: var(--cp-text);
   background: transparent;
 }
 
@@ -44,8 +210,8 @@ body {
   flex: 0 1 auto;
   width: 100%;
   border-radius: 16px;
-  border: 1px solid #30363d;
-  background: #161b22;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-shell-bg);
   -webkit-app-region: drag;
   app-region: drag;
   overflow: visible;
@@ -69,16 +235,16 @@ body {
   display: flex;
   flex-direction: column;
   border-radius: 10px;
-  border: 1px solid #30363d;
-  background: #0d1117;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-field-bg);
   -webkit-app-region: no-drag;
   app-region: no-drag;
   overflow: visible;
 }
 
 .text-box:focus-within {
-  border-color: #58a6ff;
-  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.22);
+  border-color: var(--cp-accent);
+  box-shadow: 0 0 0 2px var(--cp-focus-ring);
 }
 
 /* Form controls don’t inherit body font on macOS/WebKit; match Geist Mono from html/body */
@@ -101,7 +267,7 @@ body {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #e6edf3;
+  color: var(--cp-text);
   font-size: 14px;
   line-height: 1.35;
   outline: none;
@@ -159,8 +325,8 @@ body {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  border: 1px solid #30363d;
-  background: #21262d;
+  border: 1px solid var(--cp-border);
+  background: var(--cp-surface-elevated);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.25;
@@ -171,21 +337,21 @@ body {
 }
 
 .badge.filter-pill--repo {
-  color: #58a6ff;
-  border-color: rgba(88, 166, 255, 0.35);
-  background: rgba(88, 166, 255, 0.08);
+  color: var(--cp-filter-repo-fg);
+  border-color: var(--cp-filter-repo-border);
+  background: var(--cp-filter-repo-bg);
 }
 
 .badge.filter-pill--user {
-  color: #3fb950;
-  border-color: rgba(63, 185, 80, 0.35);
-  background: rgba(63, 185, 80, 0.08);
+  color: var(--cp-filter-user-fg);
+  border-color: var(--cp-filter-user-border);
+  background: var(--cp-filter-user-bg);
 }
 
 .badge.filter-pill--org {
-  color: #d29922;
-  border-color: rgba(210, 153, 34, 0.35);
-  background: rgba(210, 153, 34, 0.1);
+  color: var(--cp-filter-org-fg);
+  border-color: var(--cp-filter-org-border);
+  background: var(--cp-filter-org-bg);
 }
 
 .badge-dismiss {
@@ -207,7 +373,7 @@ body {
 
 .badge-dismiss:hover {
   opacity: 1;
-  background: rgba(240, 246, 252, 0.08);
+  background: var(--cp-dismiss-hover-bg);
 }
 
 .badge-label {
@@ -235,7 +401,7 @@ body {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #8b949e;
+  color: var(--cp-muted);
   font-size: 16px;
   font-weight: 400;
   line-height: 1;
@@ -244,7 +410,7 @@ body {
 }
 
 .filter-qualifier-btn:hover {
-  color: #e6edf3;
+  color: var(--cp-text);
 }
 
 /* Drop-up so the menu stays inside the palette window */
@@ -256,10 +422,10 @@ body {
   z-index: 50;
   min-width: 168px;
   padding: 4px;
-  border: 1px solid #30363d;
+  border: 1px solid var(--cp-border);
   border-radius: 8px;
-  background: #161b22;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  background: var(--cp-shell-bg);
+  box-shadow: 0 8px 24px var(--cp-menu-shadow);
 }
 
 .filter-qualifier-menu.hidden {
@@ -277,7 +443,7 @@ body {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #e6edf3;
+  color: var(--cp-text);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -288,21 +454,21 @@ body {
 .filter-qualifier-menu-item:hover,
 .filter-qualifier-menu-item:focus-visible {
   outline: none;
-  background: #21262d;
+  background: var(--cp-surface-hover);
 }
 
 .filter-qualifier-hint {
   flex-shrink: 0;
   font-size: 11px;
-  color: #8b949e;
+  color: var(--cp-muted);
 }
 
 .load-spinner {
   display: block;
   width: 10px;
   height: 10px;
-  border: 1.5px solid #30363d;
-  border-top-color: #8b949e;
+  border: 1.5px solid var(--cp-spinner-track);
+  border-top-color: var(--cp-spinner-head);
   border-radius: 50%;
   animation: load-spin 0.65s linear infinite;
 }
@@ -347,11 +513,11 @@ body {
   flex-shrink: 0;
   padding: 5px 0 0;
   font-size: 11px;
-  color: #f85149;
+  color: var(--cp-hint-error);
 }
 
 .hint.hint--muted {
-  color: #8b949e;
+  color: var(--cp-muted);
 }
 
 .hint:empty {
@@ -363,7 +529,7 @@ body {
   padding: 4px 0 0;
   font-size: 11px;
   line-height: 1.3;
-  color: #8b949e;
+  color: var(--cp-muted);
 }
 
 .results {
@@ -386,7 +552,7 @@ body {
 }
 
 .results:not(:empty) {
-  border-top: 1px solid #21262d;
+  border-top: 1px solid var(--cp-row-divider);
   margin-top: 3px;
   padding-top: 3px;
 }
@@ -419,29 +585,26 @@ body {
   display: block;
 }
 
-/* GitHub-style status colors (issues + PRs) */
-.result-icon--issue-open {
-  color: #1a7f37;
+/* GitHub-style status colors (issues + PRs); overridden per theme */
+.result-icon--issue-open,
+.result-icon--pr-open {
+  color: var(--cp-status-open);
 }
 
 .result-icon--issue-closed {
-  color: #8250df;
-}
-
-.result-icon--pr-open {
-  color: #1a7f37;
+  color: var(--cp-status-closed-issue);
 }
 
 .result-icon--pr-draft {
-  color: #6e7681;
+  color: var(--cp-status-draft);
 }
 
 .result-icon--pr-merged {
-  color: #8250df;
+  color: var(--cp-status-merged);
 }
 
 .result-icon--pr-closed {
-  color: #cf222e;
+  color: var(--cp-status-closed-pr);
 }
 
 .result-main {
@@ -454,26 +617,26 @@ body {
 
 .results li:hover,
 .results li.active {
-  background: #21262d;
+  background: var(--cp-surface-hover);
 }
 
 .results .title {
-  color: #58a6ff;
+  color: var(--cp-link);
   font-weight: 500;
 }
 
 .results .meta {
   font-size: 11px;
-  color: #8b949e;
+  color: var(--cp-muted);
 }
 
 .profile-button {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid #30363d;
+  border: 1px solid var(--cp-border);
   border-radius: 999px;
-  background: #21262d;
+  background: var(--cp-surface-elevated);
   cursor: pointer;
   overflow: hidden;
   display: flex;
@@ -483,7 +646,7 @@ body {
 }
 
 .profile-button:hover {
-  background: #30363d;
+  background: var(--cp-border);
 }
 
 .profile-button .user-avatar {
@@ -501,7 +664,7 @@ body {
 .user-avatar-placeholder {
   font-size: 12px;
   font-weight: 600;
-  color: #8b949e;
+  color: var(--cp-muted);
   line-height: 1;
 }
 
