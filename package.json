@@ -14,5 +14,9 @@
   "devDependencies": {
     "dotenv": "^16.4.5",
     "electron": "^34.0.0"
+  },
+  "dependencies": {
+    "@fontsource/geist-mono": "^5.2.7",
+    "lucide": "^1.14.0"
   }
 }

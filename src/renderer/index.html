@@ -8,6 +8,10 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https: data:"
     />
     <title>GitCP</title>
+    <link
+      rel="stylesheet"
+      href="../../node_modules/@fontsource/geist-mono/index.css"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -24,15 +28,57 @@
               spellcheck="false"
             />
           </div>
-          <div class="text-box-profile">
-            <button type="button" id="btn-auth" class="profile-button">
-              <img id="user-avatar" class="user-avatar hidden" alt="" width="32" height="32" />
-              <span id="user-avatar-placeholder" class="user-avatar-placeholder"></span>
-            </button>
+          <div class="text-box-footer">
+            <div id="text-box-loading" class="text-box-loading">
+              <div class="load-spinner-slot" aria-hidden="true">
+                <span id="load-spinner" class="load-spinner hidden" role="status" aria-label="Loading"></span>
+              </div>
+              <div class="filter-qualifier-wrap">
+                <button
+                  type="button"
+                  id="btn-filter-qualifier"
+                  class="filter-qualifier-btn"
+                  aria-label="Add search filter"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="filter-qualifier-menu"
+                >
+                  +
+                </button>
+                <div
+                  id="filter-qualifier-menu"
+                  class="filter-qualifier-menu hidden"
+                  role="menu"
+                  aria-hidden="true"
+                >
+                  <button type="button" class="filter-qualifier-menu-item" role="menuitem" data-qualifier="repo:">
+                    Repository <span class="filter-qualifier-hint">repo:</span>
+                  </button>
+                  <button type="button" class="filter-qualifier-menu-item" role="menuitem" data-qualifier="user:">
+                    User <span class="filter-qualifier-hint">user:</span>
+                  </button>
+                  <button type="button" class="filter-qualifier-menu-item" role="menuitem" data-qualifier="org:">
+                    Organization <span class="filter-qualifier-hint">org:</span>
+                  </button>
+                </div>
+              </div>
+              <div id="filter-pills" class="filter-pills" aria-label="Active search filters"></div>
+            </div>
+            <div class="text-box-profile">
+              <button type="button" id="btn-auth" class="profile-button">
+                <img id="user-avatar" class="user-avatar hidden" alt="" width="32" height="32" />
+                <span id="user-avatar-placeholder" class="user-avatar-placeholder"></span>
+              </button>
+            </div>
           </div>
         </div>
         <div class="input-box-main">
           <div id="hint" class="hint"></div>
+          <div
+            id="results-refresh-hint"
+            class="results-refresh-hint hidden"
+            aria-live="polite"
+          ></div>
           <ul id="results" class="results" role="listbox" aria-label="Search results"></ul>
         </div>
       </div>

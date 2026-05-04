@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('gitcp', {
   searchIssues: (query) => ipcRenderer.invoke('gitcp:search-issues', query),
+  listAccessibleIssues: (options) => ipcRenderer.invoke('gitcp:list-accessible-issues', options),
   openExternal: (url) => ipcRenderer.invoke('gitcp:open-external', url),
   authStatus: () => ipcRenderer.invoke('gitcp:auth-status'),
   login: () => ipcRenderer.invoke('gitcp:login'),

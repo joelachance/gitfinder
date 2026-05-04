@@ -240,8 +240,78 @@ async function searchIssuesAndPrs(query) {
   return { items: data.items || [] };
 }
 
+function normalizeIssueListItem(item) {
+  let fullName = item.repository?.full_name;
+  if (!fullName && typeof item.repository_url === 'string') {
+    const tail = item.repository_url.split('/repos/')[1];
+    if (tail) {
+      const [a, b] = tail.split('/');
+      if (a && b) fullName = `${a}/${b}`;
+    }
+  }
+  return {
+    ...item,
+    repository: { ...(item.repository || {}), full_name: fullName || 'unknown' },
+  };
+}
+
+/**
+ * Issues (and PRs) in repositories the user owns or can access (GitHub: filter=repos).
+ * @param {{ state?: 'open' | 'all'; pullRequestsOnly?: boolean }} [options]
+ * @see https://docs.github.com/en/rest/issues/issues#list-issues-assigned-to-the-authenticated-user
+ */
+async function listIssuesForAccessibleRepos(options = {}) {
+  const state = options.state === 'all' ? 'all' : 'open';
+  const pullRequestsOnly = Boolean(options.pullRequestsOnly);
+
+  const token = loadToken()?.access_token;
+  if (!token) {
+    throw new Error('Sign in with GitHub to list issues.');
+  }
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'User-Agent': 'gitcp/0.1.0',
+  };
+  const all = [];
+  for (let page = 1; page <= 10; page += 1) {
+    const url = new URL('https://api.github.com/issues');
+    url.searchParams.set('filter', 'repos');
+    url.searchParams.set('state', state);
+    url.searchParams.set('per_page', '100');
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('sort', 'updated');
+    url.searchParams.set('direction', 'desc');
+
+    const res = await fetch(url, { headers });
+    const data = await res.json().catch(() => []);
+    if (!res.ok) {
+      const msg =
+        (Array.isArray(data) ? null : data?.message) || res.statusText || 'List issues failed';
+      throw new Error(msg);
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      break;
+    }
+    for (const item of data) {
+      const normalized = normalizeIssueListItem(item);
+      if (pullRequestsOnly && !normalized.pull_request) {
+        continue;
+      }
+      all.push(normalized);
+    }
+    if (data.length < 100) {
+      break;
+    }
+  }
+  return { items: all };
+}
+
 function setupIpc() {
   ipcMain.handle('gitcp:search-issues', async (_e, query) => searchIssuesAndPrs(query));
+  ipcMain.handle('gitcp:list-accessible-issues', (_e, opts) =>
+    listIssuesForAccessibleRepos(opts ?? {}),
+  );
 
   ipcMain.handle('gitcp:open-external', async (_e, url) => {
     if (typeof url !== 'string' || !url.startsWith('https://')) {
