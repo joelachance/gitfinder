@@ -409,6 +409,17 @@ body {
   background: var(--cp-dismiss-hover-bg);
 }
 
+.badge-dismiss:focus-visible {
+  opacity: 1;
+  outline: none;
+  background: var(--cp-dismiss-hover-bg);
+  box-shadow: 0 0 0 2px var(--cp-focus-ring);
+}
+
+.badge.filter-pill:focus-within {
+  box-shadow: 0 0 0 1px var(--cp-border), 0 0 0 3px var(--cp-focus-ring);
+}
+
 .badge-label {
   overflow: hidden;
   text-overflow: ellipsis;

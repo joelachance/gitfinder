@@ -219,7 +219,9 @@ function renderFilterPills() {
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
     dismiss.className = 'badge-dismiss';
-    dismiss.setAttribute('aria-label', `Remove ${f.kind} filter`);
+    dismiss.tabIndex = 0;
+    dismiss.setAttribute('aria-label', `Remove ${f.kind} filter ${f.value}`);
+    dismiss.title = `Remove ${f.kind}:${f.value}`;
     dismiss.dataset.index = String(i);
     dismiss.textContent = '×';
 
@@ -236,14 +238,39 @@ function renderFilterPills() {
     const btn = e.target.closest('.badge-dismiss');
     if (!btn || !filterPillsEl.contains(btn)) return;
     const i = Number(btn.dataset.index);
-    if (Number.isFinite(i) && searchFilters[i]) {
-      searchFilters.splice(i, 1);
-      renderFilterPills();
-      scheduleSearch();
-    }
+    if (!Number.isFinite(i) || !searchFilters[i]) return;
+    removeSearchFilterAt(i);
+  };
+
+  filterPillsEl.onkeydown = (e) => {
+    const btn = e.target.closest('.badge-dismiss');
+    if (!btn || !filterPillsEl.contains(btn)) return;
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+    e.preventDefault();
+    const i = Number(btn.dataset.index);
+    if (!Number.isFinite(i) || !searchFilters[i]) return;
+    removeSearchFilterAt(i);
   };
 
   updateWindowHeight();
+}
+
+function focusFilterDismissAt(index) {
+  if (!filterPillsEl || index < 0) return false;
+  const next = filterPillsEl.querySelector(`.badge-dismiss[data-index="${index}"]`);
+  if (!(next instanceof HTMLButtonElement)) return false;
+  next.focus();
+  return true;
+}
+
+function removeSearchFilterAt(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= searchFilters.length) return;
+  searchFilters.splice(index, 1);
+  renderFilterPills();
+  if (!focusFilterDismissAt(index) && !focusFilterDismissAt(index - 1)) {
+    searchInput.focus();
+  }
+  scheduleSearch();
 }
 
 function tryCommitSearchFilter() {
@@ -1804,8 +1831,30 @@ btnAuth.addEventListener('click', async () => {
 
 searchInput.addEventListener('input', scheduleSearch);
 
+function handleEscapeKey() {
+  if (filterQualifierMenuEl && !filterQualifierMenuEl.classList.contains('hidden')) {
+    setFilterQualifierMenuOpen(false);
+  } else if (repoBrowseState?.step === 'list') {
+    // Activity/CI preview → back to destination menu.
+    backToRepoBrowseMenu();
+  } else if (repoBrowseState?.step === 'menu') {
+    // Menu → back to `/repos` list.
+    exitRepoBrowse();
+  } else {
+    if (isThemeCommand(searchInput.value.trim())) {
+      restoreCommittedTheme();
+    }
+    void api().hide();
+  }
+}
+
 document.addEventListener('keydown', (e) => {
   if (appEl.classList.contains('hidden')) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    handleEscapeKey();
+    return;
+  }
   if (!(e.metaKey || e.ctrlKey) || (e.key !== 'r' && e.key !== 'R')) return;
   const line = searchInput.value.trim();
   if (
@@ -1851,22 +1900,6 @@ searchInput.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (tryCommitSearchFilter()) return;
     void openSelected();
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    if (filterQualifierMenuEl && !filterQualifierMenuEl.classList.contains('hidden')) {
-      setFilterQualifierMenuOpen(false);
-    } else if (repoBrowseState?.step === 'list') {
-      // Activity/CI preview → back to destination menu.
-      backToRepoBrowseMenu();
-    } else if (repoBrowseState?.step === 'menu') {
-      // Menu → back to `/repos` list.
-      exitRepoBrowse();
-    } else {
-      if (isThemeCommand(searchInput.value.trim())) {
-        restoreCommittedTheme();
-      }
-      void api().hide();
-    }
   }
 });
 
