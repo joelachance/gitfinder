@@ -284,6 +284,10 @@ export async function fetchRepoViewItems(kind, owner, repo, token) {
           .join(' · '),
         html_url: run.html_url,
         rowKind: 'ci',
+        repoFullName: fullName,
+        runId: run.id,
+        runStatus: run.status || '',
+        runConclusion: run.conclusion || '',
       }));
     }
     case 'tags': {

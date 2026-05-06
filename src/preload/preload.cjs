@@ -9,6 +9,12 @@ contextBridge.exposeInMainWorld('gitcp', {
   listAccessibleIssues: (options) => ipcRenderer.invoke('gitcp:list-accessible-issues', options),
   listReposWithCi: () => ipcRenderer.invoke('gitcp:list-repos-ci'),
   repoView: (payload) => ipcRenderer.invoke('gitcp:repo-view', payload ?? {}),
+  copyText: (text) => ipcRenderer.invoke('gitcp:copy-text', { text }),
+  issueToggleSelfAssign: (payload) =>
+    ipcRenderer.invoke('gitcp:issue-toggle-self-assign', payload ?? {}),
+  issueReopen: (payload) => ipcRenderer.invoke('gitcp:issue-reopen', payload ?? {}),
+  workflowRerunFailed: (payload) =>
+    ipcRenderer.invoke('gitcp:workflow-rerun-failed', payload ?? {}),
   openExternal: (url) => ipcRenderer.invoke('gitcp:open-external', url),
   authStatus: () => ipcRenderer.invoke('gitcp:auth-status'),
   login: () => ipcRenderer.invoke('gitcp:login'),

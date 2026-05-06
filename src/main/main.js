@@ -2,6 +2,7 @@ import './env.js';
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   globalShortcut,
   ipcMain,
@@ -100,6 +101,104 @@ function pruneSearchIssuesCache() {
 
 function searchIssuesCacheKey(accessToken, fullQ) {
   return crypto.createHash('sha256').update(`${accessToken}\0${fullQ}`, 'utf8').digest('hex');
+}
+
+function githubHeaders(token, { json = false } = {}) {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'User-Agent': 'gitcp/0.1.0',
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+  };
+}
+
+async function githubJsonRequest(url, token, { method = 'GET', body } = {}) {
+  const res = await fetch(url, {
+    method,
+    headers: githubHeaders(token, { json: body !== undefined }),
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await res.text().catch(() => '');
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+  }
+  if (!res.ok) {
+    const msg = data.message || data.error || res.statusText || 'GitHub request failed';
+    throw new Error(msg);
+  }
+  return data;
+}
+
+function requireGithubToken(message) {
+  const token = loadToken()?.access_token;
+  if (!token) {
+    throw new Error(message);
+  }
+  return token;
+}
+
+function requireRepoIssuePayload(payload) {
+  const fullName = typeof payload?.fullName === 'string' ? payload.fullName.trim() : '';
+  const issueNumber = Number(payload?.issueNumber);
+  const pair = parseOwnerRepo(fullName);
+  if (!pair) {
+    throw new Error('Expected owner/repo for this issue action.');
+  }
+  if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+    throw new Error('Expected a valid issue number.');
+  }
+  return { fullName, issueNumber, pair };
+}
+
+async function toggleSelfAssignIssue(payload) {
+  const token = requireGithubToken('Sign in with GitHub to assign issues.');
+  const login = getAuthState().login;
+  if (!login) {
+    throw new Error('GitHub login not available for assignment.');
+  }
+  const { issueNumber, pair } = requireRepoIssuePayload(payload);
+  const currentlyAssigned = payload?.currentlyAssigned === true;
+  const url = `https://api.github.com/repos/${encodeURIComponent(pair.owner)}/${encodeURIComponent(pair.repo)}/issues/${issueNumber}/assignees`;
+  await githubJsonRequest(url, token, {
+    method: currentlyAssigned ? 'DELETE' : 'POST',
+    body: { assignees: [login] },
+  });
+  clearSearchIssuesCache();
+  return { assigned: !currentlyAssigned, login };
+}
+
+async function reopenIssue(payload) {
+  const token = requireGithubToken('Sign in with GitHub to reopen issues.');
+  const { issueNumber, pair } = requireRepoIssuePayload(payload);
+  const url = `https://api.github.com/repos/${encodeURIComponent(pair.owner)}/${encodeURIComponent(pair.repo)}/issues/${issueNumber}`;
+  await githubJsonRequest(url, token, {
+    method: 'PATCH',
+    body: { state: 'open' },
+  });
+  clearSearchIssuesCache();
+  return { state: 'open' };
+}
+
+async function rerunFailedWorkflow(payload) {
+  const token = requireGithubToken('Sign in with GitHub to rerun workflows.');
+  const fullName = typeof payload?.fullName === 'string' ? payload.fullName.trim() : '';
+  const runId = Number(payload?.runId);
+  const pair = parseOwnerRepo(fullName);
+  if (!pair) {
+    throw new Error('Expected owner/repo for this workflow run.');
+  }
+  if (!Number.isInteger(runId) || runId <= 0) {
+    throw new Error('Expected a valid workflow run id.');
+  }
+  const url = `https://api.github.com/repos/${encodeURIComponent(pair.owner)}/${encodeURIComponent(pair.repo)}/actions/runs/${runId}/rerun-failed-jobs`;
+  await githubJsonRequest(url, token, { method: 'POST' });
+  clearRepoViewCache();
+  return { ok: true };
 }
 
 /** True when createWindow() was triggered by showPalette() — show after ready-to-show. */
@@ -569,6 +668,21 @@ function setupIpc() {
     const forceRefresh = typeof payload === 'object' && payload !== null && payload.forceRefresh === true;
     return getRepoViewData(kind, fullName, { forceRefresh });
   });
+  ipcMain.handle('gitcp:copy-text', async (_e, payload) => {
+    const text = typeof payload === 'string' ? payload : payload?.text ?? '';
+    if (typeof text !== 'string' || !text.trim()) {
+      throw new Error('Nothing to copy.');
+    }
+    clipboard.writeText(text);
+    return { ok: true };
+  });
+  ipcMain.handle('gitcp:issue-toggle-self-assign', async (_e, payload) =>
+    toggleSelfAssignIssue(payload ?? {}),
+  );
+  ipcMain.handle('gitcp:issue-reopen', async (_e, payload) => reopenIssue(payload ?? {}));
+  ipcMain.handle('gitcp:workflow-rerun-failed', async (_e, payload) =>
+    rerunFailedWorkflow(payload ?? {}),
+  );
 
   ipcMain.handle('gitcp:open-external', async (_e, url) => {
     if (typeof url !== 'string' || !url.startsWith('https://')) {

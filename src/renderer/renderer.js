@@ -88,6 +88,8 @@ let themePickerWasOpen = false;
 
 /** Active in-app API key prompt state while `/api-keys` is collecting a secret. */
 let apiKeyDialogState = null;
+let currentAuthState = { loggedIn: false, login: null, avatarUrl: null };
+let pendingResultActionKey = '';
 
 function api() {
   return window.gitcp;
@@ -363,7 +365,7 @@ function buildSearchItemHaystack(item) {
   const kind = item.pull_request ? 'pull request pr' : 'issue';
   return [
     item.title,
-    item.repository?.full_name,
+    issueFullName(item),
     item.number,
     item.state,
     kind,
@@ -1020,7 +1022,7 @@ function filterIssuesBySearchText(list, searchText) {
     .filter(Boolean);
   if (terms.length === 0) return list;
   return list.filter((item) => {
-    const hay = `${item.title} ${item.repository?.full_name ?? ''}`.toLowerCase();
+    const hay = `${item.title} ${issueFullName(item)}`.toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
 }
@@ -1318,6 +1320,319 @@ function iconForRepoViewItem(rowKind) {
   }
 }
 
+function getCurrentLoginLower() {
+  return currentAuthState.login ? currentAuthState.login.toLowerCase() : '';
+}
+
+function issueFullName(item) {
+  if (typeof item?.repository?.full_name === 'string' && item.repository.full_name) {
+    return item.repository.full_name;
+  }
+  if (typeof item?.repository_url === 'string') {
+    const tail = item.repository_url.split('/repos/')[1];
+    if (tail) {
+      const [owner, repo] = tail.split('/');
+      if (owner && repo) {
+        return `${owner}/${repo}`;
+      }
+    }
+  }
+  return '';
+}
+
+function issueNumber(item) {
+  return Number.isInteger(item?.number) ? item.number : null;
+}
+
+function issueMatches(item, fullName, num) {
+  return issueFullName(item) === fullName && issueNumber(item) === num;
+}
+
+function isAssignedToCurrentUser(item) {
+  const login = getCurrentLoginLower();
+  if (!login) return false;
+  const assignees = Array.isArray(item?.assignees)
+    ? item.assignees
+    : item?.assignee
+      ? [item.assignee]
+      : [];
+  return assignees.some((assignee) => assignee?.login?.toLowerCase?.() === login);
+}
+
+function mutateMatchingIssueRows(fullName, num, mutate) {
+  const lists = [items, issuesListCache, prsListCache, searchResultsCache?.items];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (issueMatches(item, fullName, num)) {
+        mutate(item);
+      }
+    }
+  }
+}
+
+function applyIssueAssignmentLocally(fullName, num, assigned, login) {
+  mutateMatchingIssueRows(fullName, num, (item) => {
+    const assignees = Array.isArray(item.assignees)
+      ? [...item.assignees]
+      : item.assignee
+        ? [item.assignee]
+        : [];
+    const next = assignees.filter((assignee) => assignee?.login?.toLowerCase?.() !== login.toLowerCase());
+    if (assigned) {
+      next.push({ login });
+    }
+    item.assignees = next;
+    item.assignee = next[0] ?? null;
+  });
+}
+
+function applyIssueReopenedLocally(fullName, num) {
+  mutateMatchingIssueRows(fullName, num, (item) => {
+    item.state = 'open';
+  });
+}
+
+function mutateMatchingWorkflowRows(fullName, runId, mutate) {
+  const lists = [items, repoViewListCache?.rows];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (item?.rowKind === 'ci' && item?.repoFullName === fullName && item?.runId === runId) {
+        mutate(item);
+      }
+    }
+  }
+}
+
+function markWorkflowRerunRequestedLocally(fullName, runId) {
+  mutateMatchingWorkflowRows(fullName, runId, (item) => {
+    if (!String(item.subtitle || '').includes('rerun requested')) {
+      item.subtitle = item.subtitle ? `${item.subtitle} · rerun requested` : 'rerun requested';
+    }
+    item.__rerunRequested = true;
+  });
+}
+
+function refreshCurrentResultsAfterMutation() {
+  if (repoBrowseState?.step === 'list') {
+    void refreshRepoBrowseSublist({ forceSearchRefresh: true });
+    return;
+  }
+  void runSearch({ forceSearchRefresh: true });
+}
+
+function resultActionKey(action, item) {
+  if (action.kind === 'toggle-assign' || action.kind === 'reopen') {
+    return `${action.kind}:${issueFullName(item)}#${issueNumber(item)}`;
+  }
+  if (action.kind === 'rerun-failed') {
+    return `${action.kind}:${item.repoFullName || ''}:${item.runId || ''}`;
+  }
+  if (action.kind === 'copy') {
+    return `${action.kind}:${action.label}:${action.text}`;
+  }
+  return action.kind;
+}
+
+function buildResultActions(item) {
+  const actions = [];
+  if (item?.__repoView) {
+    if (item.rowKind === 'branch' && item.title) {
+      actions.push({
+        kind: 'copy',
+        label: 'Copy branch',
+        text: item.title,
+        successHint: `Copied branch ${item.title}`,
+      });
+    }
+    if (
+      item.rowKind === 'ci' &&
+      item.repoFullName &&
+      item.runId &&
+      item.runConclusion === 'failure' &&
+      !item.__rerunRequested
+    ) {
+      actions.push({
+        kind: 'rerun-failed',
+        label: 'Rerun failed',
+      });
+    }
+    return actions;
+  }
+  const fullName = issueFullName(item);
+  const num = issueNumber(item);
+  if (!fullName || !num) return actions;
+  if (item.pull_request) {
+    actions.push({
+      kind: 'copy',
+      label: 'Copy PR URL',
+      text: item.html_url || `https://github.com/${fullName}/pull/${num}`,
+      successHint: 'Copied PR URL',
+    });
+  } else {
+    actions.push({
+      kind: 'copy',
+      label: 'Copy issue',
+      text: `${fullName}#${num}`,
+      successHint: `Copied ${fullName}#${num}`,
+    });
+  }
+  if (currentAuthState.loggedIn && currentAuthState.login) {
+    actions.push({
+      kind: 'toggle-assign',
+      label: isAssignedToCurrentUser(item) ? 'Unassign' : 'Assign me',
+    });
+  }
+  if (!item.pull_request && item.state === 'closed') {
+    actions.push({
+      kind: 'reopen',
+      label: 'Reopen',
+    });
+  }
+  return actions;
+}
+
+async function handleResultAction(action, item, index) {
+  const key = resultActionKey(action, item);
+  if (pendingResultActionKey === key) return;
+  pendingResultActionKey = key;
+  activeIndex = index;
+  renderResults();
+  try {
+    if (action.kind === 'copy') {
+      await api().copyText(action.text);
+      setHint(action.successHint, { muted: true });
+      return;
+    }
+    if (action.kind === 'toggle-assign') {
+      const fullName = issueFullName(item);
+      const num = issueNumber(item);
+      const result = await api().issueToggleSelfAssign({
+        fullName,
+        issueNumber: num,
+        currentlyAssigned: isAssignedToCurrentUser(item),
+      });
+      applyIssueAssignmentLocally(fullName, num, result.assigned, result.login);
+      setHint(result.assigned ? 'Assigned to you' : 'Unassigned from you', { muted: true });
+      renderResults();
+      refreshCurrentResultsAfterMutation();
+      return;
+    }
+    if (action.kind === 'reopen') {
+      const fullName = issueFullName(item);
+      const num = issueNumber(item);
+      await api().issueReopen({
+        fullName,
+        issueNumber: num,
+      });
+      applyIssueReopenedLocally(fullName, num);
+      setHint(`Reopened ${fullName}#${num}`, { muted: true });
+      renderResults();
+      refreshCurrentResultsAfterMutation();
+      return;
+    }
+    if (action.kind === 'rerun-failed') {
+      await api().workflowRerunFailed({
+        fullName: item.repoFullName,
+        runId: item.runId,
+      });
+      markWorkflowRerunRequestedLocally(item.repoFullName, item.runId);
+      setHint('Requested rerun of failed jobs', { muted: true });
+      renderResults();
+      refreshCurrentResultsAfterMutation();
+    }
+  } catch (err) {
+    setHint(err?.message || 'Action failed');
+  } finally {
+    if (pendingResultActionKey === key) {
+      pendingResultActionKey = '';
+    }
+    renderResults();
+  }
+}
+
+function appendResultActions(row, item, index) {
+  const actions = buildResultActions(item);
+  if (!actions.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'result-actions';
+  actions.forEach((action, actionIndex) => {
+    const btn = document.createElement('button');
+    const key = resultActionKey(action, item);
+    btn.type = 'button';
+    btn.className = 'result-action-button';
+    btn.dataset.rowIndex = String(index);
+    btn.dataset.actionKind = action.kind;
+    btn.dataset.actionIndex = String(actionIndex);
+    if (action.kind === 'rerun-failed') {
+      btn.classList.add('result-action-button--primary');
+    }
+    btn.textContent = action.label;
+    btn.title = action.label;
+    btn.setAttribute('aria-label', action.label);
+    btn.disabled = pendingResultActionKey === key;
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      activeIndex = index;
+    });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void handleResultAction(action, item, index);
+    });
+    wrap.appendChild(btn);
+  });
+  row.appendChild(wrap);
+}
+
+function getFocusedResultActionButton() {
+  const el = document.activeElement;
+  return el instanceof HTMLButtonElement && el.classList.contains('result-action-button') ? el : null;
+}
+
+function focusResultActionButton(rowIndex, { kind, actionIndex } = {}) {
+  if (rowIndex < 0) return false;
+  const buttons = Array.from(
+    resultsEl.querySelectorAll(`.result-action-button[data-row-index="${rowIndex}"]`),
+  );
+  if (buttons.length === 0) return false;
+  let target = null;
+  if (kind) {
+    target = buttons.find((button) => button.dataset.actionKind === kind) ?? null;
+  }
+  if (!target && Number.isInteger(actionIndex)) {
+    target = buttons[Math.max(0, Math.min(actionIndex, buttons.length - 1))] ?? null;
+  }
+  if (!target) {
+    target = buttons[0] ?? null;
+  }
+  target?.focus();
+  return Boolean(target);
+}
+
+function moveActiveResult(delta, { preserveActionFocus = false } = {}) {
+  if (items.length === 0) return;
+  const nextIndex = delta > 0
+    ? Math.min(activeIndex + 1, items.length - 1)
+    : Math.max(activeIndex - 1, 0);
+  const focusedActionButton = preserveActionFocus ? getFocusedResultActionButton() : null;
+  const actionKind = focusedActionButton?.dataset.actionKind ?? '';
+  const actionIndex = Number(focusedActionButton?.dataset.actionIndex);
+  activeIndex = nextIndex;
+  renderResults();
+  previewThemeSelection();
+  scrollActiveIntoView();
+  if (focusedActionButton) {
+    requestAnimationFrame(() => {
+      if (!focusResultActionButton(nextIndex, { kind: actionKind, actionIndex })) {
+        focusSearchInput({ preserveSelection: true });
+      }
+    });
+  }
+}
+
 function updateWindowHeight() {
   requestAnimationFrame(() => {
     if (!appEl.classList.contains('hidden')) {
@@ -1539,6 +1854,7 @@ function renderResults() {
 
       row.appendChild(rvIconEl);
       row.appendChild(main);
+      appendResultActions(row, item, i);
       li.appendChild(row);
       li.setAttribute('aria-label', `${rvLabel}: ${item.title}`);
 
@@ -1565,7 +1881,7 @@ function renderResults() {
     const meta = document.createElement('span');
     meta.className = 'meta';
     const kind = item.pull_request ? 'PR' : 'Issue';
-    const repoName = item.repository?.full_name ?? 'unknown';
+    const repoName = issueFullName(item) || 'unknown';
     const num = item.number != null ? String(item.number) : '–';
     meta.textContent = `${kind} · ${repoName} #${num}`;
 
@@ -1574,6 +1890,7 @@ function renderResults() {
 
     row.appendChild(iconWrap);
     row.appendChild(main);
+    appendResultActions(row, item, i);
     li.appendChild(row);
     li.setAttribute('aria-label', `${statusLabel}: ${item.title}`);
 
@@ -2432,6 +2749,11 @@ filterQualifierWrapEl?.addEventListener('focusout', (e) => {
 });
 
 function updateAuthUi(status) {
+  currentAuthState = {
+    loggedIn: Boolean(status?.loggedIn),
+    login: status?.login ?? null,
+    avatarUrl: status?.avatarUrl ?? null,
+  };
   if (status?.loggedIn) {
     btnAuth.title = status.login ? `Sign out (${status.login})` : 'Sign out';
     btnAuth.setAttribute('aria-label', btnAuth.title);
@@ -2454,6 +2776,9 @@ function updateAuthUi(status) {
     userAvatarPlaceholderEl.textContent = '?';
     btnAuth.title = 'Sign in with GitHub';
     btnAuth.setAttribute('aria-label', 'Sign in with GitHub');
+  }
+  if (items.length > 0) {
+    renderResults();
   }
 }
 
@@ -2499,6 +2824,19 @@ document.addEventListener('keydown', (e) => {
     handleEscapeKey();
     return;
   }
+  const focusedActionButton = getFocusedResultActionButton();
+  if (
+    focusedActionButton &&
+    items.length > 0 &&
+    (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K' || e.key === 'ArrowDown' || e.key === 'ArrowUp')
+  ) {
+    e.preventDefault();
+    moveActiveResult(
+      e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown' ? 1 : -1,
+      { preserveActionFocus: true },
+    );
+    return;
+  }
   if (isApiKeyDialogOpen()) return;
   if (
     e.key === '/' &&
@@ -2528,11 +2866,7 @@ document.addEventListener('keydown', (e) => {
 searchInput.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    if (items.length === 0) return;
-    activeIndex = Math.min(activeIndex + 1, items.length - 1);
-    renderResults();
-    previewThemeSelection();
-    scrollActiveIntoView();
+    moveActiveResult(1);
   } else if (e.key === 'ArrowUp') {
     const trimmed = searchInput.value.trim();
     if (lastAiInputLine && trimmed === '') {
@@ -2545,24 +2879,13 @@ searchInput.addEventListener('keydown', (e) => {
       return;
     }
     e.preventDefault();
-    if (items.length === 0) return;
-    activeIndex = Math.max(activeIndex - 1, 0);
-    renderResults();
-    previewThemeSelection();
-    scrollActiveIntoView();
+    moveActiveResult(-1);
   } else if (
     items.length > 0 &&
     (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K')
   ) {
     e.preventDefault();
-    if (e.key === 'j' || e.key === 'J') {
-      activeIndex = Math.min(activeIndex + 1, items.length - 1);
-    } else {
-      activeIndex = Math.max(activeIndex - 1, 0);
-    }
-    renderResults();
-    previewThemeSelection();
-    scrollActiveIntoView();
+    moveActiveResult(e.key === 'j' || e.key === 'J' ? 1 : -1);
   } else if (e.key === 'Enter') {
     e.preventDefault();
     if (tryCommitSearchFilter()) return;

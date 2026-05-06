@@ -831,6 +831,49 @@ body {
   flex: 1;
 }
 
+.result-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.result-action-button {
+  padding: 5px 8px;
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  background: var(--cp-surface-elevated);
+  color: var(--cp-muted);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.result-action-button:hover {
+  background: var(--cp-surface-hover);
+  color: var(--cp-text);
+}
+
+.result-action-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cp-focus-ring);
+  color: var(--cp-text);
+}
+
+.result-action-button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.result-action-button--primary {
+  border-color: var(--cp-accent);
+  color: var(--cp-accent);
+}
+
 .results li:hover,
 .results li.active {
   background: var(--cp-surface-hover);
