@@ -23,6 +23,12 @@ const loadSpinnerEl = document.getElementById('load-spinner');
 const btnFilterQualifier = document.getElementById('btn-filter-qualifier');
 const filterQualifierMenuEl = document.getElementById('filter-qualifier-menu');
 const filterPillsEl = document.getElementById('filter-pills');
+const apiKeyDialogEl = document.getElementById('api-key-dialog');
+const apiKeyDialogBackdropEl = apiKeyDialogEl?.querySelector('.api-key-dialog-backdrop') ?? null;
+const apiKeyDialogPanelEl = document.getElementById('api-key-dialog-panel');
+const apiKeyDialogTitleEl = document.getElementById('api-key-dialog-title');
+const apiKeyDialogInputEl = document.getElementById('api-key-dialog-input');
+const apiKeyDialogCancelEl = document.getElementById('api-key-dialog-cancel');
 
 /** @type {{ kind: string, value: string }[]} */
 let searchFilters = [];
@@ -52,15 +58,197 @@ let repoBrowseState = null;
 
 /** Value of `reposBrowseEffectiveKey()` when `enterRepoBrowseMenu` ran; edit → exit drill-down. */
 let reposBrowseAnchorKey = '';
+let reposBrowseRestoreFullName = '';
 
 /** Only the latest `runSearch` may turn off the loading spinner (overlapping async). */
 let loadSeq = 0;
 
+/** Full input line of the last successful `/ai …` (for ↑ recall). */
+let lastAiInputLine = '';
+
+/** When true, the next `runSearch` for `/ai` skips the API (after ↑ recall). */
+let suppressNextAiRun = false;
+
+/** Multi-turn AI messages shown below the input; cleared when switching to other palette modes. */
+let aiTranscript = [];
+
 /** Last `/theme` picker visibility — used to restore the committed theme when leaving that mode. */
 let themePickerWasOpen = false;
 
+/** Active in-app API key prompt state while `/api-keys` is collecting a secret. */
+let apiKeyDialogState = null;
+
 function api() {
   return window.gitcp;
+}
+
+function focusSearchInput({ select = false, preserveSelection = false } = {}) {
+  searchInput?.focus();
+  if (select) {
+    searchInput?.select();
+    return;
+  }
+  if (preserveSelection) {
+    return;
+  }
+  const len = searchInput?.value.length ?? 0;
+  searchInput?.setSelectionRange(len, len);
+}
+
+function insertTextIntoSearchInput(text) {
+  focusSearchInput();
+  const start = searchInput.selectionStart ?? searchInput.value.length;
+  const end = searchInput.selectionEnd ?? searchInput.value.length;
+  searchInput.value = `${searchInput.value.slice(0, start)}${text}${searchInput.value.slice(end)}`;
+  const pos = start + text.length;
+  searchInput.setSelectionRange(pos, pos);
+  scheduleSearch();
+}
+
+function isApiKeyDialogOpen() {
+  return Boolean(apiKeyDialogState && apiKeyDialogEl && !apiKeyDialogEl.classList.contains('hidden'));
+}
+
+function closeApiKeyDialog({ value = null, restoreFocus = true } = {}) {
+  const state = apiKeyDialogState;
+  apiKeyDialogState = null;
+  if (apiKeyDialogInputEl) {
+    apiKeyDialogInputEl.value = '';
+  }
+  apiKeyDialogEl?.classList.add('hidden');
+  state?.resolve?.(value);
+  if (!restoreFocus) return;
+  requestAnimationFrame(() => {
+    if (state?.previousFocus?.isConnected) {
+      state.previousFocus.focus();
+      return;
+    }
+    focusSearchInput({ preserveSelection: true });
+  });
+}
+
+function openApiKeyDialog(provider) {
+  if (!apiKeyDialogEl || !apiKeyDialogTitleEl || !apiKeyDialogInputEl) {
+    setHint('API key dialog unavailable');
+    return Promise.resolve(null);
+  }
+  if (isApiKeyDialogOpen()) {
+    closeApiKeyDialog({ restoreFocus: false });
+  }
+  const label = providerDisplayName(provider);
+  apiKeyDialogTitleEl.textContent = `Paste ${label} API key`;
+  apiKeyDialogInputEl.value = '';
+  apiKeyDialogInputEl.placeholder = provider === 'anthropic' ? 'sk-ant-...' : 'sk-...';
+  apiKeyDialogState = {
+    provider,
+    previousFocus: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+    resolve: null,
+  };
+  apiKeyDialogEl.classList.remove('hidden');
+  return new Promise((resolve) => {
+    if (!apiKeyDialogState) {
+      resolve(null);
+      return;
+    }
+    apiKeyDialogState.resolve = resolve;
+    requestAnimationFrame(() => {
+      apiKeyDialogInputEl.focus();
+      apiKeyDialogInputEl.select();
+    });
+  });
+}
+
+function clearAiChatTranscript() {
+  aiTranscript = [];
+}
+
+function transcriptToItems() {
+  /** @type {unknown[]} */
+  const out = [];
+  for (const m of aiTranscript) {
+    if (m.role === 'user') {
+      out.push({ __aiUser: true, text: m.text });
+    } else {
+      out.push({ __aiResponse: true, text: m.text });
+    }
+  }
+  return out;
+}
+
+/**
+ * Submit `/ai …` on Enter: show prompt below, clear input, then stream result into the transcript.
+ * @returns {Promise<boolean>} true if this handled the key (do not run openSelected).
+ */
+async function submitAiChatFromEnter() {
+  const inputLine = searchInput.value.trim();
+  if (!isAiCommand(inputLine)) return false;
+  const question = buildAiChatPayload(inputLine);
+  if (!question.trim()) return false;
+
+  const seq = ++loadSeq;
+  const displayLine = inputLine;
+
+  searchInput.value = '';
+  aiTranscript.push({ role: 'user', text: displayLine });
+  lastAiInputLine = displayLine;
+
+  issuesListCache = null;
+  prsListCache = null;
+  reposListCache = null;
+
+  items = [...transcriptToItems(), { __aiPending: true }];
+  activeIndex = -1;
+  setHint('Waiting for AI…', { muted: true });
+  setLoading(true);
+  renderResults();
+  updateRefreshHint();
+
+  const endLoading = () => {
+    if (seq === loadSeq) setLoading(false);
+  };
+
+  try {
+    const st = await api().aiStatus();
+    if (seq !== loadSeq) return true;
+    if (!st?.configured) {
+      aiTranscript.push({
+        role: 'assistant',
+        text: 'No LLM API key active. Use /api-keys or set OPENAI_API_KEY / ANTHROPIC_API_KEY in .env.local.',
+      });
+      items = transcriptToItems();
+      activeIndex = -1;
+      setHint('Configure an API key to use /ai', { muted: true });
+      renderResults();
+      endLoading();
+      updateRefreshHint();
+      return true;
+    }
+    const data = await api().aiChat(question);
+    if (seq !== loadSeq) return true;
+    const reply = typeof data?.reply === 'string' ? data.reply : '';
+    aiTranscript.push({ role: 'assistant', text: reply });
+    items = transcriptToItems();
+    activeIndex = -1;
+    setHint(
+      `AI (${st.provider || 'openai'}) · Type /ai … and Enter for another · ↑ recall · Esc hides`,
+      { muted: true },
+    );
+    renderResults();
+  } catch (err) {
+    if (seq !== loadSeq) return true;
+    aiTranscript.push({
+      role: 'assistant',
+      text: err?.message || 'AI request failed',
+    });
+    items = transcriptToItems();
+    activeIndex = -1;
+    setHint(err?.message || 'AI request failed');
+    renderResults();
+  } finally {
+    endLoading();
+    updateRefreshHint();
+  }
+  return true;
 }
 
 function setHint(text, { muted = false } = {}) {
@@ -520,7 +708,7 @@ async function handleApiKeysAction(row) {
   const { action, provider } = row;
   if (action === 'set') {
     const label = providerDisplayName(provider);
-    const next = window.prompt(`Paste ${label} API key`);
+    const next = await openApiKeyDialog(provider);
     if (next === null) return;
     const t = next.trim();
     if (!t) {
@@ -743,6 +931,7 @@ function iconSvgForRepoMenuAction(action) {
 /** Enter drill-down from a `repos-catalog` row (`row.title` is `owner/repo`). */
 function enterRepoBrowseMenu(fullName, htmlUrl) {
   reposBrowseAnchorKey = reposBrowseEffectiveKey();
+  reposBrowseRestoreFullName = fullName;
   repoBrowseState = { step: 'menu', fullName, htmlUrl };
   buildRepoBrowseMenuItems();
 }
@@ -807,7 +996,11 @@ async function restoreReposListView() {
   const combinedFilter = buildReposLocalFilterText(inputLine);
   const filtered = filterRepoViewRows(reposListCache, combinedFilter);
   items = filtered;
-  activeIndex = items.length ? 0 : -1;
+  const restoreIndex = reposBrowseRestoreFullName
+    ? filtered.findIndex((item) => item.title === reposBrowseRestoreFullName)
+    : -1;
+  activeIndex = restoreIndex >= 0 ? restoreIndex : items.length ? 0 : -1;
+  reposBrowseRestoreFullName = '';
   const n = reposListCache.length;
   if (combinedFilter) {
     setHint(
@@ -1007,6 +1200,28 @@ function renderResults() {
 
     const row = document.createElement('div');
     row.className = 'result-row';
+
+    if (item.__aiUser) {
+      li.classList.add('result-row--ai-user');
+      const pre = document.createElement('pre');
+      pre.className = 'ai-user-prompt';
+      pre.textContent = typeof item.text === 'string' ? item.text : '';
+      li.appendChild(pre);
+      li.setAttribute('aria-label', 'Your prompt');
+      resultsEl.appendChild(li);
+      return;
+    }
+
+    if (item.__aiPending) {
+      li.classList.add('result-row--ai-pending');
+      const p = document.createElement('p');
+      p.className = 'ai-pending';
+      p.textContent = 'Waiting for AI…';
+      li.appendChild(p);
+      li.setAttribute('aria-label', 'Loading AI reply');
+      resultsEl.appendChild(li);
+      return;
+    }
 
     if (item.__aiResponse) {
       li.classList.add('result-row--ai');
@@ -1240,7 +1455,7 @@ function applySelectedSlashCommand() {
 
 async function openSelected() {
   const row = items[activeIndex];
-  if (row?.__aiResponse) {
+  if (row?.__aiUser || row?.__aiPending || row?.__aiResponse) {
     return;
   }
   if (row?.__themeOption) {
@@ -1296,6 +1511,7 @@ async function runSearch(options = {}) {
   themePickerWasOpen = inThemePicker;
 
   if (inThemePicker) {
+    clearAiChatTranscript();
     items = buildThemePickerItems(inputLine);
     activeIndex = items.length ? 0 : -1;
     setHint(items.length ? '' : 'No matching themes', { muted: !items.length });
@@ -1308,6 +1524,7 @@ async function runSearch(options = {}) {
   }
 
   if (isSignOutCommand(inputLine)) {
+    clearAiChatTranscript();
     items = [
       {
         __signOutRow: true,
@@ -1324,6 +1541,7 @@ async function runSearch(options = {}) {
   }
 
   if (isApiKeysCommand(inputLine)) {
+    clearAiChatTranscript();
     setLoading(true);
     renderResults();
     try {
@@ -1349,6 +1567,18 @@ async function runSearch(options = {}) {
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
+    if (aiTranscript.length > 0) {
+      items = transcriptToItems();
+      activeIndex = -1;
+      setHint(
+        'Ask a question after /ai (or add repo/org/user filter badges first — they are sent with your prompt). One-repo CI: include owner/repo or use a repo: badge. Keys: /api-keys or OPENAI_API_KEY / ANTHROPIC_API_KEY.',
+        { muted: true },
+      );
+      setLoading(false);
+      renderResults();
+      updateRefreshHint();
+      return;
+    }
     items = [];
     activeIndex = -1;
     setHint(
@@ -1372,6 +1602,7 @@ async function runSearch(options = {}) {
   }
 
   if (isRepoViewIncomplete(inputLine)) {
+    clearAiChatTranscript();
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
@@ -1392,6 +1623,15 @@ async function runSearch(options = {}) {
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
+    if (aiTranscript.length > 0) {
+      items = transcriptToItems();
+      activeIndex = -1;
+      setHint('');
+      setLoading(false);
+      renderResults();
+      updateRefreshHint();
+      return;
+    }
     items = [];
     activeIndex = -1;
     setHint('');
@@ -1404,6 +1644,7 @@ async function runSearch(options = {}) {
   updateRefreshHint();
 
   if (isPrCommand(inputLine)) {
+    clearAiChatTranscript();
     reposListCache = null;
     const combinedFilter = buildPrLocalFilterText(inputLine);
     setHint('');
@@ -1455,6 +1696,7 @@ async function runSearch(options = {}) {
   }
 
   if (isIssuesCommand(inputLine)) {
+    clearAiChatTranscript();
     reposListCache = null;
     const combinedFilter = buildIssuesLocalFilterText(inputLine);
     setHint('');
@@ -1512,6 +1754,7 @@ async function runSearch(options = {}) {
       repoBrowseState = null;
       reposBrowseAnchorKey = '';
     }
+    clearAiChatTranscript();
     issuesListCache = null;
     prsListCache = null;
     const combinedFilter = buildReposLocalFilterText(inputLine);
@@ -1565,6 +1808,7 @@ async function runSearch(options = {}) {
 
   const repoParsed = parseRepoViewCommand(inputLine);
   if (repoParsed) {
+    clearAiChatTranscript();
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
@@ -1643,58 +1887,39 @@ async function runSearch(options = {}) {
   }
 
   if (isAiCommand(inputLine)) {
+    if (suppressNextAiRun) {
+      suppressNextAiRun = false;
+      return;
+    }
     const question = buildAiChatPayload(inputLine);
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
-    setHint('');
-    items = [];
-    activeIndex = -1;
-    renderResults();
     if (!question.trim()) {
-      endLoading();
+      items = [];
+      activeIndex = -1;
+      setHint('');
+      setLoading(false);
+      renderResults();
       updateRefreshHint();
       return;
     }
-    setLoading(true);
-    try {
-      const st = await api().aiStatus();
-      if (seq !== loadSeq) return;
-      if (!st?.configured) {
-        items = [];
-        activeIndex = -1;
-        renderResults();
-        setHint(
-          'No LLM API key active. Use /api-keys to paste OpenAI or Anthropic, or set OPENAI_API_KEY / ANTHROPIC_API_KEY in .env.local. Optional: GITCP_AI_PROVIDER=openai|anthropic when both are set.',
-          { muted: true },
-        );
-        endLoading();
-        updateRefreshHint();
-        return;
-      }
-      const data = await api().aiChat(question);
-      if (seq !== loadSeq) return;
-      const reply = typeof data?.reply === 'string' ? data.reply : '';
-      items = [{ __aiResponse: true, text: reply }];
-      activeIndex = 0;
-      setHint(`AI (${st.provider || 'openai'}) · Esc hides palette`, { muted: true });
-      renderResults();
-    } catch (err) {
-      if (seq !== loadSeq) return;
-      items = [];
-      activeIndex = -1;
-      renderResults();
-      setHint(err?.message || 'AI request failed');
-    } finally {
-      endLoading();
-      updateRefreshHint();
-    }
+    setHint(
+      'Press Enter to send · Filter badges (+) are included in the prompt · Esc hides palette',
+      { muted: true },
+    );
+    setLoading(false);
+    items = transcriptToItems();
+    activeIndex = -1;
+    renderResults();
+    updateRefreshHint();
     return;
   }
 
   issuesListCache = null;
   prsListCache = null;
   reposListCache = null;
+  clearAiChatTranscript();
   setHint('');
   items = [];
   activeIndex = -1;
@@ -1753,6 +1978,46 @@ function setFilterQualifierMenuOpen(open) {
   updateWindowHeight();
 }
 
+function isFilterQualifierMenuOpen() {
+  return Boolean(filterQualifierMenuEl && !filterQualifierMenuEl.classList.contains('hidden'));
+}
+
+function getFilterQualifierMenuItems() {
+  return filterQualifierMenuEl
+    ? Array.from(filterQualifierMenuEl.querySelectorAll('.filter-qualifier-menu-item'))
+    : [];
+}
+
+function focusFilterQualifierButton() {
+  btnFilterQualifier?.focus();
+}
+
+function focusFilterQualifierMenuItem(index) {
+  const items = getFilterQualifierMenuItems();
+  if (!items.length) return false;
+  const nextIndex = Math.max(0, Math.min(index, items.length - 1));
+  items[nextIndex]?.focus();
+  return true;
+}
+
+function openFilterQualifierMenu({ focusIndex = 0 } = {}) {
+  if (!btnFilterQualifier || !filterQualifierMenuEl) return;
+  setFilterQualifierMenuOpen(true);
+  requestAnimationFrame(() => {
+    focusFilterQualifierMenuItem(focusIndex);
+  });
+}
+
+function closeFilterQualifierMenu({ restoreFocus = false } = {}) {
+  if (!btnFilterQualifier || !filterQualifierMenuEl) return;
+  setFilterQualifierMenuOpen(false);
+  if (restoreFocus) {
+    requestAnimationFrame(() => {
+      focusFilterQualifierButton();
+    });
+  }
+}
+
 function insertSearchQualifier(prefix) {
   const input = searchInput;
   const raw = input.value;
@@ -1765,15 +2030,45 @@ function insertSearchQualifier(prefix) {
   input.value = before + insert + after;
   const pos = start + insert.length;
   input.setSelectionRange(pos, pos);
-  input.focus();
+  focusSearchInput({ preserveSelection: true });
   scheduleSearch();
 }
 
 const filterQualifierWrapEl = btnFilterQualifier?.closest('.filter-qualifier-wrap');
 
+apiKeyDialogPanelEl?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  closeApiKeyDialog({ value: apiKeyDialogInputEl?.value ?? '' });
+});
+
+apiKeyDialogCancelEl?.addEventListener('click', () => {
+  closeApiKeyDialog();
+});
+
+apiKeyDialogBackdropEl?.addEventListener('click', () => {
+  closeApiKeyDialog();
+});
+
 btnFilterQualifier?.addEventListener('click', () => {
-  const shouldOpen = filterQualifierMenuEl?.classList.contains('hidden');
-  setFilterQualifierMenuOpen(Boolean(shouldOpen));
+  if (isFilterQualifierMenuOpen()) {
+    closeFilterQualifierMenu();
+    return;
+  }
+  openFilterQualifierMenu();
+});
+
+btnFilterQualifier?.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    openFilterQualifierMenu({ focusIndex: 0 });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const items = getFilterQualifierMenuItems();
+    openFilterQualifierMenu({ focusIndex: Math.max(0, items.length - 1) });
+  } else if (e.key === 'Escape' && isFilterQualifierMenuOpen()) {
+    e.preventDefault();
+    closeFilterQualifierMenu({ restoreFocus: true });
+  }
 });
 
 filterQualifierMenuEl?.addEventListener('click', (e) => {
@@ -1781,12 +2076,43 @@ filterQualifierMenuEl?.addEventListener('click', (e) => {
   if (!item || !filterQualifierMenuEl.contains(item)) return;
   const q = item.getAttribute('data-qualifier');
   if (q) insertSearchQualifier(q);
-  setFilterQualifierMenuOpen(false);
+  closeFilterQualifierMenu();
+});
+
+filterQualifierMenuEl?.addEventListener('keydown', (e) => {
+  const items = getFilterQualifierMenuItems();
+  if (!items.length) return;
+  const currentIndex = items.findIndex((item) => item === document.activeElement);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+    focusFilterQualifierMenuItem(nextIndex);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const nextIndex =
+      currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+    focusFilterQualifierMenuItem(nextIndex);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    focusFilterQualifierMenuItem(0);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    focusFilterQualifierMenuItem(items.length - 1);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeFilterQualifierMenu({ restoreFocus: true });
+  }
 });
 
 document.addEventListener('click', (e) => {
   if (filterQualifierWrapEl?.contains(e.target)) return;
-  setFilterQualifierMenuOpen(false);
+  closeFilterQualifierMenu();
+});
+
+filterQualifierWrapEl?.addEventListener('focusout', (e) => {
+  const next = e.relatedTarget;
+  if (next instanceof Node && filterQualifierWrapEl.contains(next)) return;
+  closeFilterQualifierMenu();
 });
 
 function updateAuthUi(status) {
@@ -1832,8 +2158,10 @@ btnAuth.addEventListener('click', async () => {
 searchInput.addEventListener('input', scheduleSearch);
 
 function handleEscapeKey() {
-  if (filterQualifierMenuEl && !filterQualifierMenuEl.classList.contains('hidden')) {
-    setFilterQualifierMenuOpen(false);
+  if (isApiKeyDialogOpen()) {
+    closeApiKeyDialog();
+  } else if (isFilterQualifierMenuOpen()) {
+    closeFilterQualifierMenu({ restoreFocus: true });
   } else if (repoBrowseState?.step === 'list') {
     // Activity/CI preview → back to destination menu.
     backToRepoBrowseMenu();
@@ -1853,6 +2181,19 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault();
     handleEscapeKey();
+    return;
+  }
+  if (isApiKeyDialogOpen()) return;
+  if (
+    e.key === '/' &&
+    !e.metaKey &&
+    !e.ctrlKey &&
+    !e.altKey &&
+    document.activeElement !== searchInput
+  ) {
+    e.preventDefault();
+    closeFilterQualifierMenu();
+    insertTextIntoSearchInput('/');
     return;
   }
   if (!(e.metaKey || e.ctrlKey) || (e.key !== 'r' && e.key !== 'R')) return;
@@ -1877,6 +2218,16 @@ searchInput.addEventListener('keydown', (e) => {
     previewThemeSelection();
     scrollActiveIntoView();
   } else if (e.key === 'ArrowUp') {
+    const trimmed = searchInput.value.trim();
+    if (lastAiInputLine && trimmed === '') {
+      e.preventDefault();
+      suppressNextAiRun = true;
+      searchInput.value = lastAiInputLine;
+      const len = lastAiInputLine.length;
+      searchInput.setSelectionRange(len, len);
+      scheduleSearch();
+      return;
+    }
     e.preventDefault();
     if (items.length === 0) return;
     activeIndex = Math.max(activeIndex - 1, 0);
@@ -1899,7 +2250,10 @@ searchInput.addEventListener('keydown', (e) => {
   } else if (e.key === 'Enter') {
     e.preventDefault();
     if (tryCommitSearchFilter()) return;
-    void openSelected();
+    void (async () => {
+      if (await submitAiChatFromEnter()) return;
+      await openSelected();
+    })();
   }
 });
 
@@ -1926,8 +2280,7 @@ function bootstrap() {
     window.gitcp.onAuthChanged((state) => updateAuthUi(state));
 
     window.gitcp.onFocusSearch(() => {
-      searchInput?.focus();
-      searchInput?.select();
+      focusSearchInput({ select: true });
       updateWindowHeight();
     });
 
@@ -1937,7 +2290,7 @@ function bootstrap() {
         updateAuthUi(status);
         renderFilterPills();
         updateRefreshHint();
-        searchInput?.focus();
+        focusSearchInput();
         scheduleSearch();
         updateWindowHeight();
       })

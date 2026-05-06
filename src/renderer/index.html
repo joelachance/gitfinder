@@ -80,6 +80,33 @@
           <ul id="results" class="results" role="listbox" aria-label="Search results"></ul>
         </div>
       </div>
+      <div
+        id="api-key-dialog"
+        class="api-key-dialog hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="api-key-dialog-title"
+      >
+        <div class="api-key-dialog-backdrop"></div>
+        <form id="api-key-dialog-panel" class="api-key-dialog-panel">
+          <h2 id="api-key-dialog-title" class="api-key-dialog-title">Paste API key</h2>
+          <input
+            id="api-key-dialog-input"
+            class="api-key-dialog-input"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="api-key-dialog-actions">
+            <button type="button" id="api-key-dialog-cancel" class="api-key-dialog-button">
+              Cancel
+            </button>
+            <button type="submit" id="api-key-dialog-save" class="api-key-dialog-button api-key-dialog-button--primary">
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
     <script type="module" src="./renderer.js"></script>
   </body>
