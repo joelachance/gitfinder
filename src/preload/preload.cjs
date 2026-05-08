@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('gitcp', {
     }),
   listAccessibleIssues: (options) => ipcRenderer.invoke('gitcp:list-accessible-issues', options),
   listReposWithCi: () => ipcRenderer.invoke('gitcp:list-repos-ci'),
+  listAccessibleOrgs: () => ipcRenderer.invoke('gitcp:list-accessible-orgs'),
   repoView: (payload) => ipcRenderer.invoke('gitcp:repo-view', payload ?? {}),
   copyText: (text) => ipcRenderer.invoke('gitcp:copy-text', { text }),
   issueToggleSelfAssign: (payload) =>
@@ -17,6 +18,7 @@ contextBridge.exposeInMainWorld('gitcp', {
     ipcRenderer.invoke('gitcp:workflow-rerun-failed', payload ?? {}),
   openExternal: (url) => ipcRenderer.invoke('gitcp:open-external', url),
   authStatus: () => ipcRenderer.invoke('gitcp:auth-status'),
+  oauthAppConnectionsUrl: () => ipcRenderer.invoke('gitcp:oauth-app-connections-url'),
   login: () => ipcRenderer.invoke('gitcp:login'),
   logout: () => ipcRenderer.invoke('gitcp:logout'),
   onAuthChanged: (fn) => {

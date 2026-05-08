@@ -408,6 +408,72 @@ export async function listUserReposPaginated(token, opts = {}) {
 }
 
 /**
+ * Organizations the authenticated user can access. Uses active org memberships when available so
+ * role information can be shown in the palette.
+ *
+ * @param {string} token
+ */
+export async function listAccessibleOrgs(token) {
+  const headers = authHeaders(token);
+  const memberships = [];
+  let url = 'https://api.github.com/user/memberships/orgs?state=active&per_page=100';
+
+  while (url) {
+    const res = await fetch(url, { headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const ghMsg =
+        (Array.isArray(data) ? null : data?.message || data?.error) ||
+        res.statusText ||
+        'Could not list organizations';
+      throw new Error(ghMsg);
+    }
+    if (!Array.isArray(data) || data.length === 0) {
+      break;
+    }
+    memberships.push(...data);
+    url = nextUrlFromLinkHeader(res.headers.get('Link'));
+  }
+
+  const seen = new Set();
+  const items = memberships
+    .map((membership) => {
+      const org = membership?.organization ?? {};
+      const login = typeof org.login === 'string' ? org.login.trim() : '';
+      if (!login) return null;
+      const dedupeKey = login.toLowerCase();
+      if (seen.has(dedupeKey)) return null;
+      seen.add(dedupeKey);
+
+      const displayName = typeof org.name === 'string' ? org.name.trim() : '';
+      const description = typeof org.description === 'string' ? org.description.trim() : '';
+      const role = typeof membership.role === 'string' ? membership.role.trim() : '';
+      const subtitleParts = [];
+      if (displayName && displayName.toLowerCase() !== dedupeKey) {
+        subtitleParts.push(displayName);
+      }
+      if (description) {
+        subtitleParts.push(description);
+      }
+      if (role) {
+        subtitleParts.push(`Role: ${role}`);
+      }
+
+      return {
+        title: login,
+        subtitle: subtitleParts.join(' · ') || 'Organization',
+        html_url: org.html_url || `https://github.com/${login}`,
+        rowKind: 'org',
+        orgLogin: login,
+      };
+    })
+    .filter((item) => item != null);
+
+  items.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+  return { items };
+}
+
+/**
  * @param {string} token
  */
 async function fetchAllUserRepos(token) {

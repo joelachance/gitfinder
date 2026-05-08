@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   getAuthState,
+  getOAuthAppConnectionsUrl,
   loadToken,
   loginWithOAuth,
   logout,
@@ -25,6 +26,7 @@ import {
   fetchRepoViewItems,
   findAccessibleRepoWithActions,
   isCiActionsEndpointBlocked,
+  listAccessibleOrgs,
   listReposWithCi,
   parseOwnerRepo,
 } from './github-repo.js';
@@ -662,6 +664,14 @@ function setupIpc() {
     return listReposWithCi(token);
   });
 
+  ipcMain.handle('gitcp:list-accessible-orgs', async () => {
+    const token = loadToken()?.access_token;
+    if (!token) {
+      throw new Error('Sign in with GitHub to list organizations.');
+    }
+    return listAccessibleOrgs(token);
+  });
+
   ipcMain.handle('gitcp:repo-view', async (_e, payload) => {
     const kind = typeof payload?.kind === 'string' ? payload.kind : '';
     const fullName = typeof payload?.fullName === 'string' ? payload.fullName.trim() : '';
@@ -692,6 +702,9 @@ function setupIpc() {
   });
 
   ipcMain.handle('gitcp:auth-status', () => getAuthState());
+  ipcMain.handle('gitcp:oauth-app-connections-url', () => ({
+    url: getOAuthAppConnectionsUrl(),
+  }));
 
   ipcMain.handle('gitcp:login', async () => {
     return signIn();

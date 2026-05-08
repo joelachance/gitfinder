@@ -20,6 +20,12 @@ function getEnv() {
   return { clientId, clientSecret };
 }
 
+export function getOAuthAppConnectionsUrl() {
+  const { clientId } = getEnv();
+  if (!clientId) return null;
+  return `https://github.com/settings/connections/applications/${encodeURIComponent(clientId)}`;
+}
+
 function fetchJson(url, opts = {}) {
   return fetch(url, {
     ...opts,

@@ -54,6 +54,9 @@ let prsListCache = null;
 /** Rows from `/repos` (repos + CI summary); reused while the query stays in that mode. */
 let reposListCache = null;
 
+/** Rows from `/orgs` (accessible organizations); reused while the query stays in that mode. */
+let orgsListCache = null;
+
 /** Latest plain GitHub search snapshot; reused for exact re-open and incremental local previews. */
 let searchResultsCache = null;
 
@@ -447,6 +450,7 @@ function isPlainSearchInput(trimmed) {
   if (isIssuesCommand(trimmed)) return false;
   if (isPrCommand(trimmed)) return false;
   if (isReposCommand(trimmed)) return false;
+  if (isOrgsCommand(trimmed)) return false;
   if (isRepoViewIncomplete(trimmed)) return false;
   if (Boolean(parseRepoViewCommand(trimmed))) return false;
   return Boolean(buildSearchQuery());
@@ -657,6 +661,29 @@ function removeSearchFilterAt(index) {
   scheduleSearch();
 }
 
+function addSearchFilter(kind, value, { nextInputValue = searchInput.value } = {}) {
+  const normalizedKind = typeof kind === 'string' ? kind.trim().toLowerCase() : '';
+  const normalizedValue = typeof value === 'string' ? value.trim() : '';
+  if (!normalizedKind || !normalizedValue) {
+    return { added: false, alreadyPresent: false };
+  }
+  const exists = searchFilters.some(
+    (filter) =>
+      filter.kind === normalizedKind &&
+      filter.value.toLowerCase() === normalizedValue.toLowerCase(),
+  );
+  searchInput.value = nextInputValue;
+  if (!exists) {
+    searchFilters.push({ kind: normalizedKind, value: normalizedValue });
+  }
+  renderFilterPills();
+  focusSearchInput();
+  const pos = searchInput.value.length;
+  searchInput.setSelectionRange(pos, pos);
+  scheduleSearch();
+  return { added: !exists, alreadyPresent: exists };
+}
+
 function tryCommitSearchFilter() {
   const t = searchInput.value.trimEnd();
   const re = /(?:^|\s)((repo|user|org):(\S+))$/;
@@ -665,10 +692,7 @@ function tryCommitSearchFilter() {
   const kind = m[2];
   const value = m[3];
   const prefix = t.slice(0, m.index).trimEnd();
-  searchFilters.push({ kind, value });
-  searchInput.value = prefix;
-  renderFilterPills();
-  scheduleSearch();
+  addSearchFilter(kind, value, { nextInputValue: prefix });
   return true;
 }
 
@@ -705,6 +729,10 @@ const SLASH_COMMANDS = [
   {
     command: '/repos',
     description: 'Your repositories + whether GitHub Actions / workflows are set up',
+  },
+  {
+    command: '/orgs',
+    description: 'Organizations your GitHub account can access, with an action to add an org: badge',
   },
   {
     command: '/repo',
@@ -750,6 +778,11 @@ function isReposCommand(trimmed) {
   return lower === '/repos' || lower.startsWith('/repos ');
 }
 
+function isOrgsCommand(trimmed) {
+  const lower = trimmed.toLowerCase();
+  return lower === '/orgs' || lower.startsWith('/orgs ');
+}
+
 function buildReposLocalFilterText(inputLine) {
   const filterText =
     inputLine === '/repos' || !inputLine.startsWith('/repos ')
@@ -757,6 +790,12 @@ function buildReposLocalFilterText(inputLine) {
       : inputLine.slice('/repos '.length).trim();
   const pillTerms = searchFilters.map((f) => f.value);
   return [filterText, ...pillTerms].filter(Boolean).join(' ');
+}
+
+function buildOrgsLocalFilterText(inputLine) {
+  return inputLine === '/orgs' || !inputLine.startsWith('/orgs ')
+    ? ''
+    : inputLine.slice('/orgs '.length).trim();
 }
 
 /**
@@ -822,7 +861,7 @@ function buildHelpItems(trimmed, shortcutInfo) {
       __helpRow: true,
       title: 'Add badges',
       description:
-        'Type repo:owner/name, user:octocat, or org:acme at the end of the input and press Enter to turn it into a badge. You can also press + to insert the qualifier first.',
+        'Type repo:owner/name, user:octocat, or org:acme at the end of the input and press Enter to turn it into a badge. You can also press + to insert the qualifier first, or use /orgs: Enter on an org row adds a badge, while the top Add an org row opens GitHub’s GitCP access page.',
     },
     {
       __helpRow: true,
@@ -1143,6 +1182,7 @@ function shouldShowSlashCommands(trimmed) {
   if (isAiCommand(trimmed)) return false;
   if (isIssuesCommand(trimmed)) return false;
   if (isReposCommand(trimmed)) return false;
+  if (isOrgsCommand(trimmed)) return false;
   if (isPrCommand(trimmed)) return false;
   if (parseRepoViewCommand(trimmed)) return false;
   if (isRepoViewIncomplete(trimmed)) return false;
@@ -1490,6 +1530,35 @@ function issueNumber(item) {
 
 function issueMatches(item, fullName, num) {
   return issueFullName(item) === fullName && issueNumber(item) === num;
+}
+
+function orgLogin(item) {
+  if (typeof item?.orgLogin === 'string' && item.orgLogin.trim()) {
+    return item.orgLogin.trim();
+  }
+  return typeof item?.title === 'string' ? item.title.trim() : '';
+}
+
+function buildManualOrgEntryRow() {
+  return {
+    __orgAddRow: true,
+    title: 'Add an org',
+    subtitle: 'Open GitHub’s GitCP app access page so you can grant organization access',
+  };
+}
+
+function buildOrgsCommandRows(filteredOrgs) {
+  return [buildManualOrgEntryRow(), ...filteredOrgs];
+}
+
+function addOrgFilterFromItem(item) {
+  const login = orgLogin(item);
+  if (!login) return;
+  const result = addSearchFilter('org', login, { nextInputValue: '' });
+  setHint(
+    result.alreadyPresent ? `org:${login} is already added` : `Added org:${login}`,
+    { muted: true },
+  );
 }
 
 function isAssignedToCurrentUser(item) {
@@ -1971,6 +2040,71 @@ function renderResults() {
       return;
     }
 
+    if (item.__orgRow) {
+      const iconWrap = resultIcon('result-icon--rv-repo', Svg.repo);
+      iconWrap.title = 'Organization';
+
+      const main = document.createElement('div');
+      main.className = 'result-main';
+
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = item.title;
+
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = item.subtitle;
+
+      main.appendChild(title);
+      main.appendChild(meta);
+
+      row.appendChild(iconWrap);
+      row.appendChild(main);
+      appendResultActions(row, item, i);
+      li.appendChild(row);
+      li.setAttribute('aria-label', `Organization: ${item.title}`);
+
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeIndex = i;
+        renderResults();
+        void openSelected();
+      });
+      resultsEl.appendChild(li);
+      return;
+    }
+
+    if (item.__orgAddRow) {
+      const iconWrap = resultIcon('result-icon--api-keys', Svg.repo);
+      iconWrap.title = 'Add organization filter';
+
+      const main = document.createElement('div');
+      main.className = 'result-main';
+
+      const title = document.createElement('span');
+      title.className = 'title';
+      title.textContent = item.title;
+
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = item.subtitle;
+
+      main.appendChild(title);
+      main.appendChild(meta);
+      row.appendChild(iconWrap);
+      row.appendChild(main);
+      li.appendChild(row);
+      li.setAttribute('aria-label', `${item.title}: ${item.subtitle}`);
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        activeIndex = i;
+        renderResults();
+        void openSelected();
+      });
+      resultsEl.appendChild(li);
+      return;
+    }
+
     // Second step: destination picker for a selected `/repos` row (`__repoMenuOption` is not `__repoView`).
     if (item.__repoMenuOption) {
       const iconWrap = resultIcon('result-icon--rv-repo', iconSvgForRepoMenuAction(item.action));
@@ -2102,6 +2236,20 @@ async function openSelected() {
   }
   if (row?.__apiKeysRow) {
     await handleApiKeysAction(row);
+    return;
+  }
+  if (row?.__orgAddRow) {
+    const info = await api().oauthAppConnectionsUrl?.();
+    const url = info?.url;
+    if (!url) {
+      setHint('GitCP OAuth app link is not configured. Set GITCP_GITHUB_CLIENT_ID first.');
+      return;
+    }
+    await api().openExternal(url);
+    return;
+  }
+  if (row?.__orgRow) {
+    addOrgFilterFromItem(row);
     return;
   }
   if (row?.__slashCommand) {
@@ -2273,6 +2421,7 @@ async function runSearch(options = {}) {
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
+    orgsListCache = null;
     repoViewListCache = null;
     if (aiTranscript.length > 0) {
       items = transcriptToItems();
@@ -2292,6 +2441,7 @@ async function runSearch(options = {}) {
   if (isPrCommand(inputLine)) {
     clearAiChatTranscript();
     reposListCache = null;
+    orgsListCache = null;
     repoViewListCache = null;
     const combinedFilter = buildPrLocalFilterText(inputLine);
     const cachedPrs = prsListCache;
@@ -2370,6 +2520,7 @@ async function runSearch(options = {}) {
   if (isIssuesCommand(inputLine)) {
     clearAiChatTranscript();
     reposListCache = null;
+    orgsListCache = null;
     repoViewListCache = null;
     const combinedFilter = buildIssuesLocalFilterText(inputLine);
     const cachedIssues = issuesListCache;
@@ -2455,6 +2606,7 @@ async function runSearch(options = {}) {
     clearAiChatTranscript();
     issuesListCache = null;
     prsListCache = null;
+    orgsListCache = null;
     repoViewListCache = null;
     const combinedFilter = buildReposLocalFilterText(inputLine);
     const cachedRepos = reposListCache;
@@ -2530,12 +2682,93 @@ async function runSearch(options = {}) {
     return;
   }
 
+  if (isOrgsCommand(inputLine)) {
+    clearAiChatTranscript();
+    issuesListCache = null;
+    prsListCache = null;
+    reposListCache = null;
+    repoViewListCache = null;
+    const combinedFilter = buildOrgsLocalFilterText(inputLine);
+    const cachedOrgs = orgsListCache;
+    const needFetch = forceSearchRefresh || !cachedOrgs;
+    if (cachedOrgs) {
+      const filteredOrgs = filterRepoViewRows(cachedOrgs, combinedFilter);
+      items = buildOrgsCommandRows(filteredOrgs);
+      activeIndex = items.length ? 0 : -1;
+      const n = cachedOrgs.length;
+      const refreshingSuffix = forceSearchRefresh ? ' · refreshing…' : '';
+      if (combinedFilter) {
+        setHint(
+          filteredOrgs.length
+            ? `${filteredOrgs.length} of ${n} org${n === 1 ? '' : 's'} match${refreshingSuffix}`
+            : `No matches in ${n} org${n === 1 ? '' : 's'}${refreshingSuffix}`,
+          { muted: true },
+        );
+      } else {
+        setHint(
+          n
+            ? `${n} org${n === 1 ? '' : 's'} you can access · Enter adds an org badge · Add an org opens GitHub${refreshingSuffix}`
+            : `No organizations returned for your account${refreshingSuffix}`,
+          { muted: true },
+        );
+      }
+      renderResults();
+    } else {
+      setHint('');
+      items = [];
+      activeIndex = -1;
+      renderResults();
+    }
+    setLoading(needFetch);
+    try {
+      if (needFetch) {
+        const data = await api().listAccessibleOrgs();
+        if (seq !== loadSeq) return;
+        orgsListCache = (data.items ?? []).map((org) => ({
+          ...org,
+          __orgRow: true,
+        }));
+      }
+      const filteredOrgs = filterRepoViewRows(orgsListCache, combinedFilter);
+      items = buildOrgsCommandRows(filteredOrgs);
+      activeIndex = items.length ? 0 : -1;
+      const n = orgsListCache.length;
+      if (combinedFilter) {
+        setHint(
+          filteredOrgs.length
+            ? `${filteredOrgs.length} of ${n} org${n === 1 ? '' : 's'} match`
+            : `No matches in ${n} org${n === 1 ? '' : 's'}`,
+          { muted: true },
+        );
+      } else {
+        setHint(
+          n
+            ? `${n} org${n === 1 ? '' : 's'} you can access · Enter adds an org badge · Add an org opens GitHub`
+            : 'No organizations returned for your account',
+          { muted: true },
+        );
+      }
+      renderResults();
+    } catch (err) {
+      orgsListCache = null;
+      items = [];
+      activeIndex = -1;
+      renderResults();
+      setHint(err?.message || 'Could not load organizations');
+    } finally {
+      endLoading();
+      updateRefreshHint();
+    }
+    return;
+  }
+
   const repoParsed = parseRepoViewCommand(inputLine);
   if (repoParsed) {
     clearAiChatTranscript();
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
+    orgsListCache = null;
     const combinedFilter = buildRepoViewLocalFilterText(repoParsed);
     const freshRepoViewCache = !forceSearchRefresh
       ? getFreshRepoViewListCache(repoParsed.kind, repoParsed.fullName)
@@ -2670,6 +2903,7 @@ async function runSearch(options = {}) {
     issuesListCache = null;
     prsListCache = null;
     reposListCache = null;
+    orgsListCache = null;
     if (!question.trim()) {
       items = [];
       activeIndex = -1;
@@ -2694,6 +2928,7 @@ async function runSearch(options = {}) {
   issuesListCache = null;
   prsListCache = null;
   reposListCache = null;
+  orgsListCache = null;
   repoViewListCache = null;
   clearAiChatTranscript();
   const freshCachedSearch = !forceSearchRefresh ? getFreshSearchResultsCache(q) : null;
@@ -2774,6 +3009,7 @@ function scheduleSearch() {
     t.startsWith('/issues ') ||
     isPrCommand(trimmed) ||
     isReposCommand(trimmed) ||
+    isOrgsCommand(trimmed) ||
     isThemeCommand(trimmed) ||
     isHelpCommand(trimmed) ||
     isSignOutCommand(trimmed) ||
