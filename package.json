@@ -6,16 +6,27 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "bun x electron .",
-    "dev": "bun x electron ."
+    "dev": "bun x electron .",
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "@types/node": "^25.6.2",
     "dotenv": "^16.4.5",
-    "electron": "^34.0.0"
+    "drizzle-kit": "^0.31.10",
+    "electron": "^34.0.0",
+    "typescript": "^6.0.3",
+    "vercel": "^53.3.2"
   },
   "dependencies": {
-    "@fontsource/geist-mono": "^5.2.7"
+    "@fontsource/geist-mono": "^5.2.7",
+    "@neondatabase/serverless": "^1.1.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.18"
   }
 }
