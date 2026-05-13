@@ -35,6 +35,10 @@ The app loads **`.env`** and **`.env.local`** (local overrides) on startup from 
 | `GITFINDER_GITHUB_CLIENT_ID` | Yes | OAuth App Client ID |
 | `GITFINDER_GITHUB_CLIENT_SECRET` | Yes | OAuth App client secret |
 | `GITFINDER_OAUTH_PORT` | No | Loopback port (default `53682`); must match the callback URL on GitHub |
+| `INGEST_API_KEY` / `INGEST_API_KEYS` | No | API key sent by the desktop app to the email ingest endpoint as `x-api-key`; for `INGEST_API_KEYS`, the first comma-separated key is used |
+| `GITFINDER_EMAIL_INGEST_URL` | No | Override for the email ingest endpoint; defaults to the production `/v1/ingest` endpoint |
+
+When `INGEST_API_KEY` is set, GitFinder requests GitHub's `user:email` OAuth scope during sign-in, reads the account's primary verified email, and posts it to the ingest endpoint. Existing sessions may need to sign out and sign in again to grant the new scope.
 
 **Option B — shell**  
 

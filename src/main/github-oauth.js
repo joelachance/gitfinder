@@ -1,12 +1,14 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import { shell } from 'electron';
+import { collectGithubEmailSignup } from './email-ingest.js';
 import { createPkcePair, randomState } from './pkce.js';
 import { clearToken, loadToken, saveToken } from './token-store.js';
 
 const AUTH_URL = 'https://github.com/login/oauth/authorize';
 const TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const API_USER = 'https://api.github.com/user';
+const API_USER_EMAILS = 'https://api.github.com/user/emails';
 
 /** GitHub OAuth apps require an exact redirect URI; use a fixed port users register as http://127.0.0.1:<port>/callback */
 const LOOPBACK_PORT = (() => {
@@ -93,6 +95,18 @@ async function exchangeCode({ code, verifier, clientId, clientSecret, redirectUr
       Authorization: `Bearer ${tokenData.access_token}`,
     },
   });
+  const emails = await fetchJson(API_USER_EMAILS, {
+    headers: {
+      Authorization: `Bearer ${tokenData.access_token}`,
+    },
+  }).catch((error) => {
+    console.warn(`GitFinder could not read GitHub email addresses: ${error.message}`);
+    return [];
+  });
+
+  await collectGithubEmailSignup({ user, emails }).catch((error) => {
+    console.warn(`GitFinder email ingest failed: ${error.message}`);
+  });
 
   const row = {
     access_token: tokenData.access_token,
@@ -176,7 +190,7 @@ export async function loginWithOAuth() {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: 'repo read:org',
+    scope: 'repo read:org user:email',
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',

@@ -41,6 +41,7 @@ import {
 } from './llm-keys.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MENU_ICON_PATH = path.join(__dirname, 'assets/GitHubTemplate.png');
 
 /** Preload must be CommonJS — ESM preload paths often fail to load with sandbox and leave `window.gitfinder` undefined. */
 function getPreloadPath() {
@@ -244,16 +245,10 @@ function hidePalette() {
 }
 
 function createTrayIcon() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-      <rect x="2.25" y="3" width="13.5" height="12" rx="2.75" fill="none" stroke="black" stroke-width="1.5"/>
-      <path d="M5.75 6.75 7.9 8.95 5.75 11.15" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M9.2 11.1h3.2" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
-  `.trim();
-  const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-  const size = process.platform === 'darwin' ? 18 : 16;
-  const icon = nativeImage.createFromDataURL(dataUrl).resize({ width: size, height: size });
+  const icon = nativeImage.createFromPath(MENU_ICON_PATH);
+  if (icon.isEmpty()) {
+    console.warn('[gitfinder] Menu icon rendered empty.');
+  }
   if (process.platform === 'darwin') {
     icon.setTemplateImage(true);
   }
@@ -306,7 +301,7 @@ function refreshTrayMenu() {
       ? `GitFinder — signed in as ${authState.login}`
       : 'GitFinder — not signed in';
   if (process.platform === 'darwin') {
-    tray.setTitle('GitFinder');
+    tray.setTitle('');
   }
   tray.setToolTip(tooltip);
   const menu = buildTrayMenu();
