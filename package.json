@@ -1,7 +1,7 @@
 {
-  "name": "gitcp",
+  "name": "gitfinder",
   "version": "0.1.0",
-  "description": "Git Command Palette — search GitHub issues & PRs, open in browser",
+  "description": "GitFinder — search GitHub issues & PRs, open in browser",
   "type": "module",
   "main": "src/main/main.js",
   "scripts": {

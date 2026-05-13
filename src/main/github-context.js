@@ -3,7 +3,7 @@
  */
 import { fetchRepoViewItems, listUserReposPaginated, parseOwnerRepo } from './github-repo.js';
 
-const USER_AGENT = 'gitcp/0.1.0';
+const USER_AGENT = 'gitfinder/0.1.0';
 
 /**
  * @param {string} token

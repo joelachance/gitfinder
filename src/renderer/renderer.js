@@ -1,8 +1,8 @@
 import { resultIcon, Svg } from './icons.js';
 
-const THEME_STORAGE_KEY = 'gitcp.theme';
+const THEME_STORAGE_KEY = 'gitfinder.theme';
 
-const GITCP_THEMES = [
+const GITFINDER_THEMES = [
   { id: 'github', title: 'Monochrome', subtitle: 'Black, white, and graphite (default)' },
   { id: 'paper', title: 'Paper', subtitle: 'Soft whites with graphite ink' },
   { id: 'arctic', title: 'Arctic glass', subtitle: 'Icy cyan on cool slate' },
@@ -102,7 +102,7 @@ let pendingResultActionKey = '';
 let shortcutInfoCache = null;
 
 function api() {
-  return window.gitcp;
+  return window.gitfinder;
 }
 
 const authMenuWrapEl = btnAuth?.closest('.text-box-profile');
@@ -941,7 +941,7 @@ function buildHelpItems(trimmed, shortcutInfo) {
       __helpRow: true,
       title: 'Add badges',
       description:
-        'Type repo:owner/name, user:octocat, or org:acme at the end of the input and press Enter to turn it into a badge. You can also press + to insert the qualifier first, or use /orgs: Enter on an org row adds a badge, while the top Add an org row opens GitHub’s GitCP access page.',
+        'Type repo:owner/name, user:octocat, or org:acme at the end of the input and press Enter to turn it into a badge. You can also press + to insert the qualifier first, or use /orgs: Enter on an org row adds a badge, while the top Add an org row opens GitHub’s GitFinder access page.',
     },
     {
       __helpRow: true,
@@ -1078,7 +1078,7 @@ function buildApiKeysItems(trimmed, status) {
         provider: p,
         title: `${providerDisplayName(p)} — Delete saved key`,
         subtitle: st.startupEnvAvailable
-          ? `Falls back to ${envName} from when GitCP started`
+          ? `Falls back to ${envName} from when GitFinder started`
           : 'Removes the stored secret from this device',
       });
     }
@@ -1088,7 +1088,7 @@ function buildApiKeysItems(trimmed, status) {
         action: 'resume-env',
         provider: p,
         title: `${providerDisplayName(p)} — Resume from environment`,
-        subtitle: 'Use the key that was available when GitCP started',
+        subtitle: 'Use the key that was available when GitFinder started',
       });
     }
   }
@@ -1142,11 +1142,11 @@ function themePickerFilterQuery(trimmed) {
 function buildThemePickerItems(trimmed) {
   const q = themePickerFilterQuery(trimmed);
   const list = q
-    ? GITCP_THEMES.filter((t) => {
+    ? GITFINDER_THEMES.filter((t) => {
         const hay = `${t.id} ${t.title} ${t.subtitle}`.toLowerCase();
         return hay.includes(q);
       })
-    : GITCP_THEMES;
+    : GITFINDER_THEMES;
   return list.map((t) => ({
     __themeOption: true,
     themeId: t.id,
@@ -1156,14 +1156,14 @@ function buildThemePickerItems(trimmed) {
 }
 
 function setThemeOnDom(themeId) {
-  if (!GITCP_THEMES.some((t) => t.id === themeId)) return;
+  if (!GITFINDER_THEMES.some((t) => t.id === themeId)) return;
   document.documentElement.setAttribute('data-theme', themeId);
 }
 
 function getCommittedThemeId() {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved && GITCP_THEMES.some((t) => t.id === saved)) return saved;
+    if (saved && GITFINDER_THEMES.some((t) => t.id === saved)) return saved;
   } catch {
     /* ignore */
   }
@@ -1446,7 +1446,7 @@ function hintForRepoBrowseSublist(total, kind, fullName) {
   return `${total} ${noun}${total === 1 ? '' : 's'} · ${fullName} · Enter opens in browser · Esc back to menu`;
 }
 
-/** Shared loader for menu choices; same IPC as slash `/ci owner/repo` (`gitcp:repo-view`). */
+/** Shared loader for menu choices; same IPC as slash `/ci owner/repo` (`gitfinder:repo-view`). */
 async function fetchRepoBrowseSublistRows(kind, fullName, forceRefresh) {
   const data = await api().repoView({
     kind,
@@ -1621,7 +1621,7 @@ function buildManualOrgEntryRow() {
   return {
     __orgAddRow: true,
     title: 'Add an org',
-    subtitle: 'Open GitHub’s GitCP app access page so you can grant organization access',
+    subtitle: 'Open GitHub’s GitFinder app access page so you can grant organization access',
   };
 }
 
@@ -2359,7 +2359,7 @@ async function openSelected() {
     const info = await api().oauthAppConnectionsUrl?.();
     const url = info?.url;
     if (!url) {
-      setHint('GitCP OAuth app link is not configured. Set GITCP_GITHUB_CLIENT_ID first.');
+      setHint('GitFinder OAuth app link is not configured. Set GITFINDER_GITHUB_CLIENT_ID first.');
       return;
     }
     await api().openExternal(url);
@@ -3194,7 +3194,7 @@ function scheduleSearch() {
   const delay = instantIssues ? 0 : 220;
   debounceTimer = setTimeout(() => {
     void runSearch().catch((err) => {
-      console.error('[gitcp] runSearch', err);
+      console.error('[gitfinder] runSearch', err);
       setHint(err?.message ?? 'Something went wrong');
       setLoading(false);
     });
@@ -3543,7 +3543,7 @@ function scrollActiveIntoView() {
 function bootstrap() {
   initStoredTheme();
 
-  if (!window.gitcp) {
+  if (!window.gitfinder) {
     hintEl.textContent =
       'Internal error: preload failed. Quit and reinstall, or run from the repo with bun run start.';
     appEl.classList.remove('hidden');
@@ -3555,18 +3555,18 @@ function bootstrap() {
      * resolved, so the palette was completely invisible if IPC was slow or never settled. */
     appEl.classList.remove('hidden');
 
-    window.gitcp.onAuthChanged((state) => {
+    window.gitfinder.onAuthChanged((state) => {
       homeActivityCache = null;
       updateAuthUi(state);
       scheduleSearch();
     });
 
-    window.gitcp.onFocusSearch(() => {
+    window.gitfinder.onFocusSearch(() => {
       focusSearchInput({ select: true });
       updateWindowHeight();
     });
 
-    window.gitcp
+    window.gitfinder
       .authStatus()
       .then((status) => {
         updateAuthUi(status);
@@ -3577,11 +3577,11 @@ function bootstrap() {
         updateWindowHeight();
       })
       .catch(() => {
-        hintEl.textContent = 'Could not load GitCP bridge.';
+        hintEl.textContent = 'Could not load GitFinder bridge.';
       });
   } catch (e) {
-    console.error('[gitcp] bootstrap', e);
-    hintEl.textContent = e?.message ?? 'GitCP UI failed to start.';
+    console.error('[gitfinder] bootstrap', e);
+    hintEl.textContent = e?.message ?? 'GitFinder UI failed to start.';
     appEl.classList.remove('hidden');
   }
 }

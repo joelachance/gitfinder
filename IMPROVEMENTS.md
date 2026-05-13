@@ -1,4 +1,4 @@
-# GitCP Improvements
+# GitFinder Improvements
 
 This is the saved product/engineering improvement list from the planning discussion.
 

@@ -42,7 +42,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Preload must be CommonJS — ESM preload paths often fail to load with sandbox and leave `window.gitcp` undefined. */
+/** Preload must be CommonJS — ESM preload paths often fail to load with sandbox and leave `window.gitfinder` undefined. */
 function getPreloadPath() {
   return path.join(__dirname, '../preload/preload.cjs');
 }
@@ -55,12 +55,13 @@ let mainWindow = null;
 let tray = null;
 
 /**
- * Shortcuts to try in order. macOS: Command+Alt+P+R after Command+Shift+P (many apps use ⌘⇧P).
+ * Shortcuts to try in order. macOS leads with Command+G by default, then falls back.
  * Final fallback is Alt+Space for visibility without stealing Cmd/Ctrl combos.
  */
 const SHORTCUT_CANDIDATES =
   process.platform === 'darwin'
     ? [
+        'Command+G',
         'Command+Shift+P',
         'Command+Alt+P+R',
         'Command+Alt+P',
@@ -110,7 +111,7 @@ function githubHeaders(token, { json = false } = {}) {
   return {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
-    'User-Agent': 'gitcp/0.1.0',
+    'User-Agent': 'gitfinder/0.1.0',
     ...(json ? { 'Content-Type': 'application/json' } : {}),
   };
 }
@@ -210,7 +211,7 @@ let pendingPaletteReveal = false;
 function broadcastAuth() {
   const state = getAuthState();
   for (const w of BrowserWindow.getAllWindows()) {
-    w.webContents.send('gitcp:auth-changed', state);
+    w.webContents.send('gitfinder:auth-changed', state);
   }
   refreshTrayMenu();
 }
@@ -225,7 +226,7 @@ function revealPalette() {
   }
   mainWindow.show();
   mainWindow.focus();
-  mainWindow.webContents.send('gitcp:focus-search');
+  mainWindow.webContents.send('gitfinder:focus-search');
 }
 
 function showPalette() {
@@ -281,7 +282,7 @@ function buildTrayMenu() {
   const authState = getAuthState();
   return Menu.buildFromTemplate([
     {
-      label: 'Open GitCP',
+      label: 'Open GitFinder',
       click: () => showPalette(),
     },
     { type: 'separator' },
@@ -302,10 +303,10 @@ function refreshTrayMenu() {
   const authState = getAuthState();
   const tooltip =
     authState.loggedIn && authState.login
-      ? `GitCP — signed in as ${authState.login}`
-      : 'GitCP — not signed in';
+      ? `GitFinder — signed in as ${authState.login}`
+      : 'GitFinder — not signed in';
   if (process.platform === 'darwin') {
-    tray.setTitle('GitCP');
+    tray.setTitle('GitFinder');
   }
   tray.setToolTip(tooltip);
   const menu = buildTrayMenu();
@@ -341,7 +342,7 @@ async function signInFromTray() {
     await signIn();
   } catch (error) {
     dialog.showErrorBox(
-      'GitCP Sign-In Failed',
+      'GitFinder Sign-In Failed',
       getErrorMessage(error, 'GitHub sign-in did not complete.'),
     );
   }
@@ -386,12 +387,12 @@ function registerGlobalShortcuts() {
       registeredShortcuts.push(acc);
       if (!activeShortcut) activeShortcut = acc;
     } else {
-      console.warn('[gitcp] Could not register shortcut:', acc);
+      console.warn('[gitfinder] Could not register shortcut:', acc);
     }
   }
 
   if (!activeShortcut) {
-    console.error('[gitcp] No global shortcuts registered — use the menu bar icon to open GitCP.');
+    console.error('[gitfinder] No global shortcuts registered — use the menu bar icon to open GitFinder.');
   }
 }
 
@@ -410,7 +411,7 @@ function createWindow() {
     backgroundColor: '#00000000',
     hasShadow: false,
     ...(process.platform === 'darwin' ? { roundedCorners: false } : {}),
-    title: 'GitCP',
+    title: 'GitFinder',
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
@@ -422,7 +423,7 @@ function createWindow() {
 
   mainWindow.webContents.on('console-message', (_event, level, message) => {
     if (level >= 2) {
-      console.error('[gitcp:renderer]', message);
+      console.error('[gitfinder:renderer]', message);
     }
   });
 
@@ -501,7 +502,7 @@ async function searchIssuesAndPrs(query, { forceRefresh = false } = {}) {
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
-      'User-Agent': 'gitcp/0.1.0',
+      'User-Agent': 'gitfinder/0.1.0',
     },
   });
 
@@ -546,7 +547,7 @@ async function listIssuesForAccessibleRepos(options = {}) {
   const headers = {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
-    'User-Agent': 'gitcp/0.1.0',
+    'User-Agent': 'gitfinder/0.1.0',
   };
   const all = [];
   for (let page = 1; page <= 10; page += 1) {
@@ -647,17 +648,17 @@ async function getRepoViewData(kind, fullName, options = {}) {
 }
 
 function setupIpc() {
-  ipcMain.handle('gitcp:search-issues', async (_e, payload) => {
+  ipcMain.handle('gitfinder:search-issues', async (_e, payload) => {
     const query = typeof payload === 'string' ? payload : payload?.query ?? '';
     const forceRefresh =
       typeof payload === 'object' && payload !== null && payload.forceRefresh === true;
     return searchIssuesAndPrs(query, { forceRefresh });
   });
-  ipcMain.handle('gitcp:list-accessible-issues', (_e, opts) =>
+  ipcMain.handle('gitfinder:list-accessible-issues', (_e, opts) =>
     listIssuesForAccessibleRepos(opts ?? {}),
   );
 
-  ipcMain.handle('gitcp:list-repos-ci', async () => {
+  ipcMain.handle('gitfinder:list-repos-ci', async () => {
     const token = loadToken()?.access_token;
     if (!token) {
       throw new Error('Sign in with GitHub to list repositories.');
@@ -665,7 +666,7 @@ function setupIpc() {
     return listReposWithCi(token);
   });
 
-  ipcMain.handle('gitcp:home-activity', async () => {
+  ipcMain.handle('gitfinder:home-activity', async () => {
     const token = loadToken()?.access_token;
     if (!token) {
       throw new Error('Sign in with GitHub to load recent activity.');
@@ -673,7 +674,7 @@ function setupIpc() {
     return listHomeActivity(token);
   });
 
-  ipcMain.handle('gitcp:list-accessible-orgs', async () => {
+  ipcMain.handle('gitfinder:list-accessible-orgs', async () => {
     const token = loadToken()?.access_token;
     if (!token) {
       throw new Error('Sign in with GitHub to list organizations.');
@@ -681,13 +682,13 @@ function setupIpc() {
     return listAccessibleOrgs(token);
   });
 
-  ipcMain.handle('gitcp:repo-view', async (_e, payload) => {
+  ipcMain.handle('gitfinder:repo-view', async (_e, payload) => {
     const kind = typeof payload?.kind === 'string' ? payload.kind : '';
     const fullName = typeof payload?.fullName === 'string' ? payload.fullName.trim() : '';
     const forceRefresh = typeof payload === 'object' && payload !== null && payload.forceRefresh === true;
     return getRepoViewData(kind, fullName, { forceRefresh });
   });
-  ipcMain.handle('gitcp:copy-text', async (_e, payload) => {
+  ipcMain.handle('gitfinder:copy-text', async (_e, payload) => {
     const text = typeof payload === 'string' ? payload : payload?.text ?? '';
     if (typeof text !== 'string' || !text.trim()) {
       throw new Error('Nothing to copy.');
@@ -695,35 +696,35 @@ function setupIpc() {
     clipboard.writeText(text);
     return { ok: true };
   });
-  ipcMain.handle('gitcp:issue-toggle-self-assign', async (_e, payload) =>
+  ipcMain.handle('gitfinder:issue-toggle-self-assign', async (_e, payload) =>
     toggleSelfAssignIssue(payload ?? {}),
   );
-  ipcMain.handle('gitcp:issue-reopen', async (_e, payload) => reopenIssue(payload ?? {}));
-  ipcMain.handle('gitcp:workflow-rerun-failed', async (_e, payload) =>
+  ipcMain.handle('gitfinder:issue-reopen', async (_e, payload) => reopenIssue(payload ?? {}));
+  ipcMain.handle('gitfinder:workflow-rerun-failed', async (_e, payload) =>
     rerunFailedWorkflow(payload ?? {}),
   );
 
-  ipcMain.handle('gitcp:open-external', async (_e, url) => {
+  ipcMain.handle('gitfinder:open-external', async (_e, url) => {
     if (typeof url !== 'string' || !url.startsWith('https://')) {
       throw new Error('Invalid URL');
     }
     await shell.openExternal(url);
   });
 
-  ipcMain.handle('gitcp:auth-status', () => getAuthState());
-  ipcMain.handle('gitcp:oauth-app-connections-url', () => ({
+  ipcMain.handle('gitfinder:auth-status', () => getAuthState());
+  ipcMain.handle('gitfinder:oauth-app-connections-url', () => ({
     url: getOAuthAppConnectionsUrl(),
   }));
 
-  ipcMain.handle('gitcp:login', async () => {
+  ipcMain.handle('gitfinder:login', async () => {
     return signIn();
   });
 
-  ipcMain.handle('gitcp:logout', () => signOut());
+  ipcMain.handle('gitfinder:logout', () => signOut());
 
-  ipcMain.handle('gitcp:llm-keys-status', () => llmKeysStatus());
+  ipcMain.handle('gitfinder:llm-keys-status', () => llmKeysStatus());
 
-  ipcMain.handle('gitcp:llm-keys-set', async (_e, payload) => {
+  ipcMain.handle('gitfinder:llm-keys-set', async (_e, payload) => {
     const p = payload?.provider;
     const value = typeof payload?.value === 'string' ? payload.value : '';
     if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
@@ -731,28 +732,28 @@ function setupIpc() {
     return llmKeysStatus();
   });
 
-  ipcMain.handle('gitcp:llm-keys-clear-app', async (_e, payload) => {
+  ipcMain.handle('gitfinder:llm-keys-clear-app', async (_e, payload) => {
     const p = payload?.provider;
     if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
     clearLlmAppKey(p);
     return llmKeysStatus();
   });
 
-  ipcMain.handle('gitcp:llm-keys-unset-env', async (_e, payload) => {
+  ipcMain.handle('gitfinder:llm-keys-unset-env', async (_e, payload) => {
     const p = payload?.provider;
     if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
     unsetLlmEnvKey(p);
     return llmKeysStatus();
   });
 
-  ipcMain.handle('gitcp:llm-keys-resume-env', async (_e, payload) => {
+  ipcMain.handle('gitfinder:llm-keys-resume-env', async (_e, payload) => {
     const p = payload?.provider;
     if (p !== 'openai' && p !== 'anthropic') throw new Error('Invalid provider');
     resumeLlmEnv(p);
     return llmKeysStatus();
   });
 
-  ipcMain.handle('gitcp:shortcut-info', () => ({
+  ipcMain.handle('gitfinder:shortcut-info', () => ({
     candidates: SHORTCUT_CANDIDATES,
     registered: registeredShortcuts,
     primary: registeredShortcuts[0] ?? null,
@@ -760,20 +761,20 @@ function setupIpc() {
     anyRegistered: registeredShortcuts.length > 0,
   }));
 
-  ipcMain.handle('gitcp:hide', () => {
+  ipcMain.handle('gitfinder:hide', () => {
     hidePalette();
   });
 
-  ipcMain.handle('gitcp:set-palette-height', (_e, heightPx) => {
+  ipcMain.handle('gitfinder:set-palette-height', (_e, heightPx) => {
     if (!mainWindow || typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return;
     const [w] = mainWindow.getContentSize();
     const h = Math.min(520, Math.max(96, Math.round(heightPx)));
     mainWindow.setContentSize(Math.max(w, 480), h);
   });
 
-  ipcMain.handle('gitcp:ai-status', () => getAiStatus());
+  ipcMain.handle('gitfinder:ai-status', () => getAiStatus());
 
-  ipcMain.handle('gitcp:ai-chat', async (_e, payload) => {
+  ipcMain.handle('gitfinder:ai-chat', async (_e, payload) => {
     const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
     if (!message) {
       throw new Error('Type your question after /ai (example: /ai summarize open issues).');

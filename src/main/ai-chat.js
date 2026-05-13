@@ -18,7 +18,9 @@ export function getAiStatus() {
 export function getAiConfig() {
   const openaiKey = process.env.OPENAI_API_KEY?.trim() || '';
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim() || '';
-  let provider = (process.env.GITCP_AI_PROVIDER || '').trim().toLowerCase();
+  let provider = (process.env.GITFINDER_AI_PROVIDER || process.env.GITCP_AI_PROVIDER || '')
+    .trim()
+    .toLowerCase();
   if (provider !== 'openai' && provider !== 'anthropic') {
     if (openaiKey && !anthropicKey) provider = 'openai';
     else if (anthropicKey && !openaiKey) provider = 'anthropic';
@@ -29,13 +31,18 @@ export function getAiConfig() {
     provider: /** @type {'openai' | 'anthropic' | ''} */ (provider),
     openaiKey,
     anthropicKey,
-    openaiModel: process.env.GITCP_OPENAI_MODEL?.trim() || 'gpt-4o-mini',
+    openaiModel:
+      process.env.GITFINDER_OPENAI_MODEL?.trim() ||
+      process.env.GITCP_OPENAI_MODEL?.trim() ||
+      'gpt-4o-mini',
     anthropicModel:
-      process.env.GITCP_ANTHROPIC_MODEL?.trim() || 'claude-3-5-haiku-20241022',
+      process.env.GITFINDER_ANTHROPIC_MODEL?.trim() ||
+      process.env.GITCP_ANTHROPIC_MODEL?.trim() ||
+      'claude-3-5-haiku-20241022',
   };
 }
 
-const SYSTEM_PROMPT = `You are GitCP's assistant. You receive live summaries from the GitHub REST API: open issues/PRs, repositories (each line may include GitHub’s short **description** field), and—when the user names **owner/repo**—the repo **README** (default branch) and **GitHub Actions** runs when available.
+const SYSTEM_PROMPT = `You are GitFinder's assistant. You receive live summaries from the GitHub REST API: open issues/PRs, repositories (each line may include GitHub’s short **description** field), and—when the user names **owner/repo**—the repo **README** (default branch) and **GitHub Actions** runs when available.
 
 **Naming a repository:** Per-repo data is loaded when **owner/repo** appears in the user’s message (e.g. \`myorg/my-repo\`). The snapshot may include a line **“Repository inferred from the user question”** — if that line is present, the user **already** named the repo; **never** tell them to “ask again with owner/repo” or imply they forgot it.
 
@@ -170,7 +177,7 @@ export async function runAiChat(githubToken, userMessage) {
   const cfg = getAiConfig();
   if (!cfg.provider) {
     throw new Error(
-      'Configure AI: set OPENAI_API_KEY and/or ANTHROPIC_API_KEY (.env / .env.local), paste keys in GitCP (/api-keys), or set GITCP_AI_PROVIDER when both providers have keys.',
+      'Configure AI: set OPENAI_API_KEY and/or ANTHROPIC_API_KEY (.env / .env.local), paste keys in GitFinder (/api-keys), or set GITFINDER_AI_PROVIDER when both providers have keys.',
     );
   }
   if (cfg.provider === 'openai' && !cfg.openaiKey) {

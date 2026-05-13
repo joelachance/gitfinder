@@ -10,13 +10,16 @@ const API_USER = 'https://api.github.com/user';
 
 /** GitHub OAuth apps require an exact redirect URI; use a fixed port users register as http://127.0.0.1:<port>/callback */
 const LOOPBACK_PORT = (() => {
-  const n = parseInt(process.env.GITCP_OAUTH_PORT ?? '', 10);
+  const n = parseInt(process.env.GITFINDER_OAUTH_PORT ?? process.env.GITCP_OAUTH_PORT ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : 53_682;
 })();
 
 function getEnv() {
-  const clientId = process.env.GITCP_GITHUB_CLIENT_ID?.trim();
-  const clientSecret = process.env.GITCP_GITHUB_CLIENT_SECRET?.trim();
+  const clientId =
+    process.env.GITFINDER_GITHUB_CLIENT_ID?.trim() || process.env.GITCP_GITHUB_CLIENT_ID?.trim();
+  const clientSecret =
+    process.env.GITFINDER_GITHUB_CLIENT_SECRET?.trim() ||
+    process.env.GITCP_GITHUB_CLIENT_SECRET?.trim();
   return { clientId, clientSecret };
 }
 
@@ -31,7 +34,7 @@ function fetchJson(url, opts = {}) {
     ...opts,
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'gitcp/0.1.0',
+      'User-Agent': 'gitfinder/0.1.0',
       ...opts.headers,
     },
   }).then(async (r) => {
@@ -106,7 +109,7 @@ export async function loginWithOAuth() {
   const { clientId, clientSecret } = getEnv();
   if (!clientId || !clientSecret) {
     throw new Error(
-      'Set GITCP_GITHUB_CLIENT_ID and GITCP_GITHUB_CLIENT_SECRET (GitHub OAuth App credentials).',
+      'Set GITFINDER_GITHUB_CLIENT_ID and GITFINDER_GITHUB_CLIENT_SECRET (GitHub OAuth App credentials).',
     );
   }
 
@@ -131,7 +134,7 @@ export async function loginWithOAuth() {
     const returned = requestUrl.searchParams.get('state');
     const errParam = requestUrl.searchParams.get('error');
     const htmlOk =
-      '<body style="font-family:sans-serif;padding:24px"><p>You can close this tab and return to GitCP.</p></body>';
+      '<body style="font-family:sans-serif;padding:24px"><p>You can close this tab and return to GitFinder.</p></body>';
     const sendHtml = (status, body) => {
       res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(body);

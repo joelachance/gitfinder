@@ -71,7 +71,7 @@ describe('collect-emails app', () => {
         },
         body: JSON.stringify({
           name: 'Ada Lovelace',
-          source: 'gitcp',
+          source: 'gitfinder',
           email: 'ada@example.com',
           gx_version: '1.2.3',
         }),
@@ -108,7 +108,7 @@ describe('collect-emails app', () => {
         },
         body: JSON.stringify({
           name: 'Ada Lovelace',
-          source: 'gitcp',
+          source: 'gitfinder',
           email: 'ada@example.com',
           gx_version: '1.2.3',
           extra: 'nope',
@@ -135,7 +135,7 @@ describe('collect-emails app', () => {
         },
         body: JSON.stringify({
           name: ' Ada Lovelace ',
-          source: ' gitcp ',
+          source: ' gitfinder ',
           email: ' ADA@Example.COM ',
           gx_version: ' 1.2.3 ',
         }),
@@ -147,7 +147,7 @@ describe('collect-emails app', () => {
     expect(store.calls).toEqual([
       {
         name: 'Ada Lovelace',
-        source: 'gitcp',
+        source: 'gitfinder',
         email: 'ada@example.com',
         gxVersion: '1.2.3',
         lastIpHash: expect.any(String),

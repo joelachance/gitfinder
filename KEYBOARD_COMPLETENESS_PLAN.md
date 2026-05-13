@@ -1,6 +1,6 @@
 # Keyboard Completeness Plan
 
-Goal: make GitCP fully usable without the mouse.
+Goal: make GitFinder fully usable without the mouse.
 
 ## Definition
 
@@ -23,12 +23,12 @@ No dead ends, no hidden focus traps, no controls that only work if `#query` is f
 
 The current renderer already has pieces of this:
 
-- DOM controls live in [src/renderer/index.html](/Users/joe/git/gitcp/src/renderer/index.html:16).
-- Result-list navigation is mostly input-driven in [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js:2005).
-- Filter-pill rendering/removal lives in [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js:313).
-- Theme preview/commit behavior lives in [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js:658).
-- Palette-level `Escape` handling is now global in [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js:1968).
-- Focus styling for pill dismiss buttons exists in [src/renderer/styles.css](/Users/joe/git/gitcp/src/renderer/styles.css:396).
+- DOM controls live in [src/renderer/index.html](/Users/joe/git/gitfinder/src/renderer/index.html:16).
+- Result-list navigation is mostly input-driven in [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js:2005).
+- Filter-pill rendering/removal lives in [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js:313).
+- Theme preview/commit behavior lives in [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js:658).
+- Palette-level `Escape` handling is now global in [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js:1968).
+- Focus styling for pill dismiss buttons exists in [src/renderer/styles.css](/Users/joe/git/gitfinder/src/renderer/styles.css:396).
 
 What is still missing is system design. The app has local fixes, but not one coherent keyboard model.
 
@@ -104,7 +104,7 @@ This belongs in one shared helper, not scattered across focused controls.
 
 Files:
 
-- [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js)
+- [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js)
 
 Work:
 
@@ -124,8 +124,8 @@ Target functions:
 
 Files:
 
-- [src/renderer/index.html](/Users/joe/git/gitcp/src/renderer/index.html)
-- [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js)
+- [src/renderer/index.html](/Users/joe/git/gitfinder/src/renderer/index.html)
+- [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js)
 
 Work:
 
@@ -143,8 +143,8 @@ Open gap today:
 
 Files:
 
-- [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js)
-- [src/renderer/styles.css](/Users/joe/git/gitcp/src/renderer/styles.css)
+- [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js)
+- [src/renderer/styles.css](/Users/joe/git/gitfinder/src/renderer/styles.css)
 
 Work:
 
@@ -163,8 +163,8 @@ Needed styles:
 
 Files:
 
-- [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js:658)
-- [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js:1408)
+- [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js:658)
+- [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js:1408)
 
 Work:
 
@@ -176,7 +176,7 @@ Work:
 
 Files:
 
-- [src/renderer/renderer.js](/Users/joe/git/gitcp/src/renderer/renderer.js)
+- [src/renderer/renderer.js](/Users/joe/git/gitfinder/src/renderer/renderer.js)
 
 Work:
 

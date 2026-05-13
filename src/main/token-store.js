@@ -8,23 +8,30 @@ function authPath() {
   return path.join(app.getPath('userData'), FILE_NAME);
 }
 
+function legacyAuthPath() {
+  return path.join(app.getPath('appData'), 'gitcp', FILE_NAME);
+}
+
 export function loadToken() {
-  const p = authPath();
-  if (!fs.existsSync(p)) return null;
-  const raw = fs.readFileSync(p);
-  try {
-    if (safeStorage.isEncryptionAvailable()) {
-      const decrypted = safeStorage.decryptString(raw);
-      return JSON.parse(decrypted);
+  const paths = [authPath(), legacyAuthPath()];
+  for (const p of paths) {
+    if (!fs.existsSync(p)) continue;
+    const raw = fs.readFileSync(p);
+    try {
+      if (safeStorage.isEncryptionAvailable()) {
+        const decrypted = safeStorage.decryptString(raw);
+        return JSON.parse(decrypted);
+      }
+    } catch {
+      return null;
     }
-  } catch {
-    return null;
+    try {
+      return JSON.parse(raw.toString('utf8'));
+    } catch {
+      return null;
+    }
   }
-  try {
-    return JSON.parse(raw.toString('utf8'));
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function saveToken(data) {
@@ -38,6 +45,7 @@ export function saveToken(data) {
 }
 
 export function clearToken() {
-  const p = authPath();
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+  for (const p of [authPath(), legacyAuthPath()]) {
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
 }

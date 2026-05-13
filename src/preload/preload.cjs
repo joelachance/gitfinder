@@ -1,49 +1,49 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('gitcp', {
+contextBridge.exposeInMainWorld('gitfinder', {
   searchIssues: (query, options = {}) =>
-    ipcRenderer.invoke('gitcp:search-issues', {
+    ipcRenderer.invoke('gitfinder:search-issues', {
       query: typeof query === 'string' ? query : '',
       forceRefresh: Boolean(options.forceRefresh),
     }),
-  listAccessibleIssues: (options) => ipcRenderer.invoke('gitcp:list-accessible-issues', options),
-  listReposWithCi: () => ipcRenderer.invoke('gitcp:list-repos-ci'),
-  homeActivity: () => ipcRenderer.invoke('gitcp:home-activity'),
-  listAccessibleOrgs: () => ipcRenderer.invoke('gitcp:list-accessible-orgs'),
-  repoView: (payload) => ipcRenderer.invoke('gitcp:repo-view', payload ?? {}),
-  copyText: (text) => ipcRenderer.invoke('gitcp:copy-text', { text }),
+  listAccessibleIssues: (options) => ipcRenderer.invoke('gitfinder:list-accessible-issues', options),
+  listReposWithCi: () => ipcRenderer.invoke('gitfinder:list-repos-ci'),
+  homeActivity: () => ipcRenderer.invoke('gitfinder:home-activity'),
+  listAccessibleOrgs: () => ipcRenderer.invoke('gitfinder:list-accessible-orgs'),
+  repoView: (payload) => ipcRenderer.invoke('gitfinder:repo-view', payload ?? {}),
+  copyText: (text) => ipcRenderer.invoke('gitfinder:copy-text', { text }),
   issueToggleSelfAssign: (payload) =>
-    ipcRenderer.invoke('gitcp:issue-toggle-self-assign', payload ?? {}),
-  issueReopen: (payload) => ipcRenderer.invoke('gitcp:issue-reopen', payload ?? {}),
+    ipcRenderer.invoke('gitfinder:issue-toggle-self-assign', payload ?? {}),
+  issueReopen: (payload) => ipcRenderer.invoke('gitfinder:issue-reopen', payload ?? {}),
   workflowRerunFailed: (payload) =>
-    ipcRenderer.invoke('gitcp:workflow-rerun-failed', payload ?? {}),
-  openExternal: (url) => ipcRenderer.invoke('gitcp:open-external', url),
-  authStatus: () => ipcRenderer.invoke('gitcp:auth-status'),
-  oauthAppConnectionsUrl: () => ipcRenderer.invoke('gitcp:oauth-app-connections-url'),
-  login: () => ipcRenderer.invoke('gitcp:login'),
-  logout: () => ipcRenderer.invoke('gitcp:logout'),
+    ipcRenderer.invoke('gitfinder:workflow-rerun-failed', payload ?? {}),
+  openExternal: (url) => ipcRenderer.invoke('gitfinder:open-external', url),
+  authStatus: () => ipcRenderer.invoke('gitfinder:auth-status'),
+  oauthAppConnectionsUrl: () => ipcRenderer.invoke('gitfinder:oauth-app-connections-url'),
+  login: () => ipcRenderer.invoke('gitfinder:login'),
+  logout: () => ipcRenderer.invoke('gitfinder:logout'),
   onAuthChanged: (fn) => {
     const listener = (_e, state) => fn(state);
-    ipcRenderer.on('gitcp:auth-changed', listener);
-    return () => ipcRenderer.removeListener('gitcp:auth-changed', listener);
+    ipcRenderer.on('gitfinder:auth-changed', listener);
+    return () => ipcRenderer.removeListener('gitfinder:auth-changed', listener);
   },
   onFocusSearch: (fn) => {
     const listener = () => fn();
-    ipcRenderer.on('gitcp:focus-search', listener);
-    return () => ipcRenderer.removeListener('gitcp:focus-search', listener);
+    ipcRenderer.on('gitfinder:focus-search', listener);
+    return () => ipcRenderer.removeListener('gitfinder:focus-search', listener);
   },
-  shortcutInfo: () => ipcRenderer.invoke('gitcp:shortcut-info'),
-  hide: () => ipcRenderer.invoke('gitcp:hide'),
-  setPaletteHeight: (heightPx) => ipcRenderer.invoke('gitcp:set-palette-height', heightPx),
-  aiStatus: () => ipcRenderer.invoke('gitcp:ai-status'),
+  shortcutInfo: () => ipcRenderer.invoke('gitfinder:shortcut-info'),
+  hide: () => ipcRenderer.invoke('gitfinder:hide'),
+  setPaletteHeight: (heightPx) => ipcRenderer.invoke('gitfinder:set-palette-height', heightPx),
+  aiStatus: () => ipcRenderer.invoke('gitfinder:ai-status'),
   aiChat: (message) =>
-    ipcRenderer.invoke('gitcp:ai-chat', {
+    ipcRenderer.invoke('gitfinder:ai-chat', {
       message: typeof message === 'string' ? message : '',
     }),
-  llmKeysStatus: () => ipcRenderer.invoke('gitcp:llm-keys-status'),
+  llmKeysStatus: () => ipcRenderer.invoke('gitfinder:llm-keys-status'),
   llmKeysSet: (provider, value) =>
-    ipcRenderer.invoke('gitcp:llm-keys-set', { provider, value }),
-  llmKeysClearApp: (provider) => ipcRenderer.invoke('gitcp:llm-keys-clear-app', { provider }),
-  llmKeysUnsetEnv: (provider) => ipcRenderer.invoke('gitcp:llm-keys-unset-env', { provider }),
-  llmKeysResumeEnv: (provider) => ipcRenderer.invoke('gitcp:llm-keys-resume-env', { provider }),
+    ipcRenderer.invoke('gitfinder:llm-keys-set', { provider, value }),
+  llmKeysClearApp: (provider) => ipcRenderer.invoke('gitfinder:llm-keys-clear-app', { provider }),
+  llmKeysUnsetEnv: (provider) => ipcRenderer.invoke('gitfinder:llm-keys-unset-env', { provider }),
+  llmKeysResumeEnv: (provider) => ipcRenderer.invoke('gitfinder:llm-keys-resume-env', { provider }),
 });

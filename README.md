@@ -1,4 +1,4 @@
-# GitCP (Git Command Palette)
+# GitFinder
 
 Minimal v0.1: a global shortcut opens a small window. Sign in with **GitHub OAuth only**, search **issues and pull requests** with the GitHub Search API, and press **Enter** to open the **canonical** `html_url` for that item in your browser.
 
@@ -14,7 +14,7 @@ Minimal v0.1: a global shortcut opens a small window. Sign in with **GitHub OAut
 
    `http://127.0.0.1:53682/callback`
 
-   (This matches the default loopback port. To use another port, set `GITCP_OAUTH_PORT` and use the same URL with that port in the GitHub app settings.)
+   (This matches the default loopback port. To use another port, set `GITFINDER_OAUTH_PORT` and use the same URL with that port in the GitHub app settings.)
 3. Copy the **Client ID** and generate a **Client secret**.
 
 ## Environment
@@ -32,15 +32,15 @@ The app loads **`.env`** and **`.env.local`** (local overrides) on startup from 
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GITCP_GITHUB_CLIENT_ID` | Yes | OAuth App Client ID |
-| `GITCP_GITHUB_CLIENT_SECRET` | Yes | OAuth App client secret |
-| `GITCP_OAUTH_PORT` | No | Loopback port (default `53682`); must match the callback URL on GitHub |
+| `GITFINDER_GITHUB_CLIENT_ID` | Yes | OAuth App Client ID |
+| `GITFINDER_GITHUB_CLIENT_SECRET` | Yes | OAuth App client secret |
+| `GITFINDER_OAUTH_PORT` | No | Loopback port (default `53682`); must match the callback URL on GitHub |
 
 **Option B — shell**  
 
 ```bash
-export GITCP_GITHUB_CLIENT_ID="your_client_id"
-export GITCP_GITHUB_CLIENT_SECRET="your_client_secret"
+export GITFINDER_GITHUB_CLIENT_ID="your_client_id"
+export GITFINDER_GITHUB_CLIENT_SECRET="your_client_secret"
 ```
 
 ## Run
@@ -52,22 +52,23 @@ bun run start
 
 On Linux, if you see a sandbox error when running as root, you can start the binary with `--no-sandbox` (only when you understand the tradeoff), e.g. `bun x electron . --no-sandbox`.
 
-## Opening GitCP (shortcut + tray)
+## Opening GitFinder (shortcut + tray)
 
-GitCP registers **several** global shortcuts when possible; the first one that successfully registers is used.
+GitFinder registers **several** global shortcuts when possible; the first one that successfully registers is used.
 
 | Priority (macOS) | Typical binding |
 |------------------|------------------|
-| 1 | **⌘+Shift+P** |
-| 2 | **⌘+⌥+P+R** (if Electron accepts it on your OS) |
-| 3 | **⌘+Option+P** |
-| 4 | **⌥+Space** |
+| 1 | **⌘+G** |
+| 2 | **⌘+Shift+P** |
+| 3 | **⌘+⌥+P+R** (if Electron accepts it on your OS) |
+| 4 | **⌘+Option+P** |
+| 5 | **⌥+Space** |
 
 Windows/Linux: **Ctrl+Shift+P**, **Ctrl+Alt+P+R**, **Ctrl+Alt+P**, **Alt+Space**.
 
 If **none** of them register (system shortcuts already taken), use the **menu bar** icon on macOS or **system tray** on Windows/Linux.
 
-- macOS: look for **GitCP** in the menu bar, click it to open the dropdown, then choose **Open GitCP**, **Sign In / Sign Out**, or **Quit**.
+- macOS: look for **GitFinder** in the menu bar, click it to open the dropdown, then choose **Open GitFinder**, **Sign In / Sign Out**, or **Quit**.
 - Windows/Linux: left-click the tray icon to open the palette; right-click for the tray menu.
 
 **Technical note:** The preload script must load correctly (`preload.cjs`). If the UI shows “preload failed”, reinstall deps or run `bun install` from this repo.

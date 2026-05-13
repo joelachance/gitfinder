@@ -1,6 +1,6 @@
 /**
  * Load `.env` / `.env.local` from the repo root before other main-process modules
- * read GITCP_* variables (github-oauth reads PORT at import time).
+ * read GITFINDER_* variables (github-oauth reads PORT at import time).
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
