@@ -1,93 +1,37 @@
-# GitFinder
+# gitfinder
 
-Minimal v0.1: a global shortcut opens a small window. Sign in with **GitHub OAuth only**, search **issues and pull requests** with the GitHub Search API, and press **Enter** to open the **canonical** `html_url` for that item in your browser.
+**gitfinder** is a tiny command palette for developers. press **⌘G**, sign in with GitHub, and interact with your code, just as you do in Github.
 
-## Requirements
+You can search repos, issues, pull up ci jobs, and use ai to search Github.
 
-- [Bun](https://bun.sh) (used for install and `bun x electron`)
-- A **GitHub OAuth App** (not a GitHub App installation)
+vim bindings, and Enter to navigate to the Github page.
 
-## GitHub OAuth app setup
+This is for anyone who lives in GitHub and wants a **fast, keyboard-first** way to jump to the right page without navigating the Github website.
 
-1. Create an OAuth app: GitHub → **Settings** → **Developer settings** → **OAuth Apps** → **New OAuth App**.
-2. **Authorization callback URL** must be exactly:
+![gitfinder in action — search issues and PRs, open in the browser](demos/ci.gif)
 
-   `http://127.0.0.1:53682/callback`
+## How it works
 
-   (This matches the default loopback port. To use another port, set `GITFINDER_OAUTH_PORT` and use the same URL with that port in the GitHub app settings.)
-3. Copy the **Client ID** and generate a **Client secret**.
+1. **Install and run** the  app on your machine ([Bun](https://bun.sh) + `bun install` / `bun run start` from this repo. website & .dmg coming soon).
+2. **Sign in once** with **GitHub OAuth** (device flow). **Your email and name is collected for usage purposes.**
+3. Open the command palette using **⌘G**.
+4. /help to get started. All commands are slash commands, which you can find in the help menu.
+5.**Escape** hides the command palette while the app keeps running and preserves search state. Drag the top strip to move the palette.
 
-## Environment
+## Who it’s for
 
-**Option A — `.env` file (recommended)**  
+Anyone who lives in GitHub issues and PRs and wants a **fast, keyboard-first** way to jump to the right thread without leaving their editor flow for long.
 
-In the project root, copy [`.env.example`](.env.example) to **`.env`** and add your values:
+## Get started (developers)
 
-```bash
-cp .env.example .env
-# edit .env — it is gitignored
-```
-
-The app loads **`.env`** and **`.env.local`** (local overrides) on startup from the same directory as `package.json`.
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GITFINDER_GITHUB_CLIENT_ID` | Yes | OAuth App Client ID |
-| `GITFINDER_GITHUB_CLIENT_SECRET` | Yes | OAuth App client secret |
-| `GITFINDER_OAUTH_PORT` | No | Loopback port (default `53682`); must match the callback URL on GitHub |
-| `INGEST_API_KEY` / `INGEST_API_KEYS` | No | API key sent by the desktop app to the email ingest endpoint as `x-api-key`; for `INGEST_API_KEYS`, the first comma-separated key is used |
-| `GITFINDER_EMAIL_INGEST_URL` | No | Override for the email ingest endpoint; defaults to the production `/v1/ingest` endpoint |
-
-When `INGEST_API_KEY` is set, GitFinder requests GitHub's `user:email` OAuth scope during sign-in, reads the account's primary verified email, and posts it to the ingest endpoint. Existing sessions may need to sign out and sign in again to grant the new scope.
-
-**Option B — shell**  
-
-```bash
-export GITFINDER_GITHUB_CLIENT_ID="your_client_id"
-export GITFINDER_GITHUB_CLIENT_SECRET="your_client_secret"
-```
-
-## Run
+- **Requirements:** [Bun](https://bun.sh) (install and `bun x electron`), and a **GitHub OAuth App** with **Device Flow** enabled. Copy [`.env.example`](.env.example) to `.env` and set `GITFINDER_GITHUB_CLIENT_ID` if you are not using the bundled defaults. Optional env: `INGEST_API_KEY` / `INGEST_API_KEYS`, `GITFINDER_EMAIL_INGEST_URL` for the sign-in email ingest path.
 
 ```bash
 bun install
 bun run start
 ```
 
-On Linux, if you see a sandbox error when running as root, you can start the binary with `--no-sandbox` (only when you understand the tradeoff), e.g. `bun x electron . --no-sandbox`.
-
-## Opening GitFinder (shortcut + tray)
-
-GitFinder registers **several** global shortcuts when possible; the first one that successfully registers is used.
-
-| Priority (macOS) | Typical binding |
-|------------------|------------------|
-| 1 | **⌘+G** |
-| 2 | **⌘+Shift+P** |
-| 3 | **⌘+⌥+P+R** (if Electron accepts it on your OS) |
-| 4 | **⌘+Option+P** |
-| 5 | **⌥+Space** |
-
-Windows/Linux: **Ctrl+Shift+P**, **Ctrl+Alt+P+R**, **Ctrl+Alt+P**, **Alt+Space**.
-
-If **none** of them register (system shortcuts already taken), use the **menu bar** icon on macOS or **system tray** on Windows/Linux.
-
-- macOS: look for **GitFinder** in the menu bar, click it to open the dropdown, then choose **Open GitFinder**, **Sign In / Sign Out**, or **Quit**.
-- Windows/Linux: left-click the tray icon to open the palette; right-click for the tray menu.
-
-**Technical note:** The preload script must load correctly (`preload.cjs`). If the UI shows “preload failed”, reinstall deps or run `bun install` from this repo.
-
-**Window:** Frameless composer-style panel; **Escape** hides it; the app **stays running** and keeps search state. **Drag** the top strip to move.
-
-**Quit:** Tray/menu → **Quit**, or **⌘+Q** / **Alt+F4** when focused (depending on OS).
-
-## What v0.1 does not include
-
-- Personal access tokens (OAuth only)
-- GitHub Enterprise host switching
-- Persistent search cache / SQLite
-- Installers and code signing (use `bun run start` for local use)
+On Linux, if you hit Electron sandbox errors as root, you may use `bun x electron . --no-sandbox`.
 
 ## License
-
-MIT (match your repo policy if different).
+MIT.
