@@ -8,7 +8,7 @@ vim bindings, and Enter to navigate to the Github page.
 
 This is for anyone who lives in GitHub and wants a **fast, keyboard-first** way to jump to the right page without navigating the Github website.
 
-![gitfinder in action — search issues and PRs, open in the browser](demos/ci.gif)
+![gitfinder in action — search issues and PRs, open in the browser](demos/pr.gif)
 
 ## How it works
 
