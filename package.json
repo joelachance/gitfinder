@@ -1,16 +1,39 @@
 {
   "name": "gitfinder",
   "version": "0.1.0",
-  "description": "GitFinder — search GitHub issues & PRs, open in browser",
+  "license": "MIT",
+  "description": "gitfinder — search GitHub issues & PRs, open in browser",
   "type": "module",
   "main": "src/main/main.js",
   "scripts": {
     "start": "bun x electron .",
     "dev": "bun x electron .",
+    "dist:mac": "electron-builder --mac dmg",
     "check": "tsc --noEmit",
     "test": "bun test",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
+  },
+  "build": {
+    "appId": "co.satori.gitfinder",
+    "productName": "GitFinder",
+    "asar": true,
+    "files": [
+      "package.json",
+      "src/main/**/*",
+      "src/preload/**/*",
+      "src/renderer/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg"
+      ],
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    }
   },
   "engines": {
     "node": ">=18"
@@ -20,6 +43,7 @@
     "dotenv": "^16.4.5",
     "drizzle-kit": "^0.31.10",
     "electron": "^34.0.0",
+    "electron-builder": "^26.8.1",
     "typescript": "^6.0.3",
     "vercel": "^53.3.2"
   },
