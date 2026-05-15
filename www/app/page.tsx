@@ -1,4 +1,5 @@
-const DOWNLOAD_URL = "/downloads/GitFinder-0.1.0-arm64.dmg";
+const DOWNLOAD_URL =
+  "https://github.com/joelachance/gitfinder/releases/latest/download/GitFinder-0.1.0-arm64.dmg";
 const GITHUB_URL = "https://github.com/joelachance/gitcp";
 
 const QUICK_DOCS = [
